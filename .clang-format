@@ -1,0 +1,15 @@
+BasedOnStyle: LLVM
+ColumnLimit: 100
+IndentWidth: 4
+BreakTemplateDeclarations: Yes
+RequiresClausePosition: WithPreceding
+AllowShortBlocksOnASingleLine: Always
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLambdasOnASingleLine: All
+AllowShortLoopsOnASingleLine: TRUE
+BreakBeforeBraces: Allman
+BraceWrapping:
+  SplitEmptyRecord: false
+  AfterClass: false
+  AfterStruct: false
+AccessModifierOffset: -4
