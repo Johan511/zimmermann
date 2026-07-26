@@ -16,6 +16,7 @@ EXAMPLES = [
             "bin/HelloWorld",
             "include/messages.hpp",
         ],
+        "tests": ["HelloWorld"]
     },
     {
         "name": "complex",
@@ -61,6 +62,15 @@ EXAMPLES = [
         "install": [
             "bin/a",
         ],
+    },
+    {
+        "name": "ze_test",
+        "binary": "bin/ze_test",
+        "expected": ["Test runner example"],
+        "install": [
+            "bin/ze_test",
+        ],
+        "tests": ["test_pass", "test_args"]
     },
 ]
 
@@ -138,6 +148,22 @@ def run_binary(install_dir: str, binary: str) -> tuple[str, int] | None:
     result = subprocess.run([bin_path], capture_output=True, text=True, cwd=install_dir, env=env)
     return result.stdout if result.returncode == 0 else None
 
+def run_test(build_dir: str, tests: list[str]) -> bool:
+    for t in tests:
+        result = subprocess.run(
+            ["ninja", "-C", build_dir, f"test-{t}"],
+            stdout=subprocess.DEVNULL,
+            cwd=build_dir,
+        )
+        if result.returncode != 0:
+            return False
+    result = subprocess.run(
+        ["ninja", "-C", build_dir, "test"],
+        stdout=subprocess.DEVNULL,
+        cwd=build_dir,
+    )
+    return result.returncode == 0
+
 def run_ninja_install(build_dir: str) -> bool:
     log_path = os.path.join(build_dir, "install.log")
     with open(log_path, "w") as log:
@@ -209,6 +235,11 @@ def test_example(example: dict, perf: bool = False) -> bool:
         print(f"FAIL  {name}: output mismatch")
         return False
     t6 = time.perf_counter()
+
+    if("tests" in example):
+        if not run_test(build_dir, example["tests"]):
+            print(f"FAIL  {name}: ninja test failed")
+            return False
 
     msg = f"PASS  {name}"
     if perf:

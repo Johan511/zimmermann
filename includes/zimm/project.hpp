@@ -3,6 +3,7 @@
 #include "config.hpp"
 #include "installer.hpp"
 #include "target.hpp"
+#include "tester.hpp"
 #include <cassert>
 #include <filesystem>
 #include <optional>
@@ -73,6 +74,9 @@ public:
     Installer *installer() noexcept { return &m_installer; }
     const Installer *installer() const noexcept { return &m_installer; }
 
+    Tester *tester() noexcept { return &m_tester; }
+    const Tester *tester() const noexcept { return &m_tester; }
+
     void register_top_level_target(Target *target) { m_topLevelTargets.emplace_back(target); }
     void add_global_property(PropertyObject property) { m_globalProperties.push_back(property); }
 
@@ -136,6 +140,7 @@ private:
     Directory m_installDir;
 
     Installer m_installer;
+    Tester m_tester;
 };
 
 void generate_build(Project &project);

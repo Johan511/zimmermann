@@ -90,6 +90,18 @@ std::string ninja_target_name(std::string_view fileAbsPath /* cxx or c file */)
     return objectFilePath;
 }
 
+std::string test_name(const detail::Test &test)
+{
+    std::ostringstream oss;
+    oss << test.exec->name();
+    oss << test.conflatedArgs;
+
+    std::string testName = std::move(oss).str();
+    for (char &c : testName)
+        if (!std::isalpha(c)) c = '_';
+    return testName;
+}
+
 void generate_build(Project &project)
 {
     project.fold_post_order(
@@ -279,7 +291,6 @@ void generate_build(Project &project)
             }
         });
 
-    // --- Install rules ---
     const auto &install_map = project.installer()->map();
     if (!install_map.empty())
     {
@@ -327,6 +338,39 @@ void generate_build(Project &project)
         for (auto &t : phony_targets) out << " " << t;
         out << "\n\n";
     }
+
+    // TODO: ninja test <args> -> calls executable with args
+    out << "\n# --- Test rules ---\n\n";
+    out << "rule run_test\n";
+    out << "  command = $cmd > $name.stdout 2> $name.stderr && ";
+    out << "echo \"SUCCESS: $name\" || (echo \"FAILURE: $name\" && exit 1)\n";
+    out << "  description = TEST $name\n\n";
+
+    // maps from executable name to tests
+    std::unordered_map<std::string, std::vector<const detail::Test *>> testMap;
+
+    for (const auto &test : project.tester()->tests())
+    {
+        auto testName = test_name(test);
+        std::string execName{test.exec->name()};
+        out << "build " << testName << ".test.stamp: run_test | " << execName << "\n";
+        out << "  name = " << testName << "\n";
+        out << "  cmd = ./" << ninja_target_name(*test.exec) << ' ' << test.conflatedArgs;
+        out << "\n\n";
+
+        testMap[execName].push_back(&test);
+    }
+
+    for (const auto &[execName, tests] : testMap)
+    {
+        out << "build test-" << execName << ": phony";
+        for (const auto *test : tests) out << " " << test_name(*test) << ".test.stamp";
+        out << "\n\n";
+    }
+
+    out << "build test: phony";
+    for (const auto &[execName, _] : testMap) out << " test-" << execName;
+    out << "\n\n";
 
     out.close();
     std::cout << "Done. Run `ninja` to build.\n";
