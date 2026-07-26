@@ -108,7 +108,7 @@ void generate_build(Project &project)
             auto metaCmd = tpt.meta_build_cmd();
             if (metaCmd.empty()) return;
 
-            std::string metaStamp = std::format("{}/{}.meta.stamp", tpt.build_dir(), t->name());
+            std::string metaStamp = std::format("{}.meta.stamp", t->name());
             if (fs::exists(metaStamp)) return;
 
             fs::create_directories(fs::path{tpt.build_dir()});
@@ -133,11 +133,15 @@ void generate_build(Project &project)
     std::string ld = config.toolchain_prefix + "g++";
 
     out << "rule cxx\n";
-    out << "  command = " << gxx << " -c $in -o $out $flags\n";
+    out << "  command = " << gxx << " -MD -MT $out -MF $out.d -c $in -o $out $flags\n";
+    out << "  depfile = $out.d\n";
+    out << "  deps = gcc\n";
     out << "  description = CXX $out\n\n";
 
     out << "rule cc\n";
-    out << "  command = " << gcc << " -c $in -o $out $flags\n";
+    out << "  command = " << gcc << " -MD -MT $out -MF $out.d -c $in -o $out $flags\n";
+    out << "  depfile = $out.d\n";
+    out << "  deps = gcc\n";
     out << "  description = CC $out\n\n";
 
     out << "rule ar\n";
