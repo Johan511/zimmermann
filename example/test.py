@@ -89,13 +89,15 @@ def build_zimm(test_dir: str) -> str | None:
     os.makedirs(build_dir)
 
     repo_root = os.path.dirname(EXAMPLES_DIR)
-    includes = os.path.join(repo_root, "includes")
-    lib_dir = os.path.join(repo_root, "build")
+    install_dir = os.path.join(repo_root, "install")
+    includes = os.path.join(install_dir, "include")
+    lib_dir = os.path.join(install_dir, "lib64")
 
     ze_bin = os.path.join(build_dir, "ze_build")
     cmd = [
         "g++", source,
         "-std=c++23",
+        "-g",
         f"-I{includes}",
         f"-L{lib_dir}", "-lzimmermann",
         "-Wall", "-Wextra", "-Wpedantic", "-Werror",

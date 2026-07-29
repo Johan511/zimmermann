@@ -24,9 +24,7 @@ inline std::string get_absolute_path(std::string_view path, std::source_location
 
 static inline std::string rel_path(std::string relPath,
                                    std::source_location loc = std::source_location::current())
-{
-    return detail::get_absolute_path(relPath, loc);
-}
+{ return detail::get_absolute_path(relPath, loc); }
 
 class Directory
 {
@@ -42,7 +40,4 @@ public:
 
     std::string make(std::string suffix) const { return m_dirPath + std::move(suffix); }
 };
-
-static inline std::string_view build_dir() { return "./"; }
-
 } // namespace zimm

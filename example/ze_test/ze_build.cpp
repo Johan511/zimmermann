@@ -9,7 +9,7 @@ int main()
     Project prj{"ZeTest", std::move(cfg)};
     prj.add_global_property(CompileFlagProperty{"-std=c++23"});
 
-    auto demo = make_executable("ze_test_demo");
+    auto demo = make_executable("ze_test");
     demo->add_source(rel_path("main.cpp"));
     prj.register_top_level_target(demo.get());
     prj.installer()->install_binary(demo.get());

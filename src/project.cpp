@@ -1,5 +1,8 @@
+#include "../includes/zimm/project.hpp"
 #include "../includes/zimm/detail/utils.hpp"
-#include "../includes/zimm/zimm.hpp"
+#include "../includes/zimm/properties.hpp"
+#include "../includes/zimm/target.hpp"
+#include "gen_cc.hpp"
 #include <cstdlib>
 #include <filesystem>
 #include <format>
@@ -97,8 +100,8 @@ std::string test_name(const detail::Test &test)
     oss << test.conflatedArgs;
 
     std::string testName = std::move(oss).str();
-    for (char &c : testName)
-        if (!std::isalpha(c)) c = '_';
+    for (auto &c : testName)
+        if (!std::isalpha(static_cast<unsigned char>(c))) c = '_';
     return testName;
 }
 
@@ -127,7 +130,7 @@ void generate_build(Project &project)
             std::string cmd =
                 std::format("cd {} && {} && touch {}", tpt.build_dir(), metaCmd, metaStamp);
             if (std::system(cmd.c_str()) != 0)
-                LOGF("Warning: meta-build step for '" << tpt.name() << "' failed (continuing)\n");
+                LOGF("Warning: meta-build step for '" << tpt.name() << "' failed");
         });
 
     std::string ninja = "build.ninja";
@@ -175,6 +178,8 @@ void generate_build(Project &project)
     std::string globalCompileFlags = get_compile_flags(project.global_properties());
     std::string globalLinkFlags = get_link_flags(project.global_properties());
 
+    GenCc genCc;
+
     project.fold_post_order(
         [&](const Target *targetPtr) -> void
         {
@@ -211,10 +216,15 @@ void generate_build(Project &project)
                         << depList << '\n';
                     sourceObjectsNinjaNames += " " + objectNinjaName;
 
-                    out << "  flags = " << globalCompileFlags;
-                    out << " " << localCompileFlags;
-                    out << " " << (isCxx ? config.cxx_flags : config.c_flags);
-                    out << "\n\n";
+                    std::string flags = globalCompileFlags;
+                    flags += " " + localCompileFlags;
+                    flags += " " + (isCxx ? config.cxx_flags : config.c_flags);
+                    out << "  flags = " << flags << "\n\n";
+
+                    genCc.add_entry(build_dir(), std::string{src},
+                                    std::format("{} -MD -MT {} -MF {}.d -c {} -o {} {}",
+                                                isCxx ? gxx : gcc, objectNinjaName, objectNinjaName,
+                                                src, objectNinjaName, flags));
                 }
             }
 
@@ -266,6 +276,9 @@ void generate_build(Project &project)
                 out << "  dir = " << tpt.build_dir() << "\n";
                 out << "  cmd = " << build << "\n";
                 out << "  desc = BUILD " << tpt.name() << "\n\n";
+
+                genCc.add_entry(fs::absolute(tpt.build_dir()), ninja_target_name(tpt),
+                                std::string{build});
                 break;
             }
             case TargetType::CustomTarget:
@@ -283,13 +296,26 @@ void generate_build(Project &project)
                 // Third Party Target is not expected to have sources
                 if (depsEnsured) LOGF("Why does Third Party Target have sources?");
 
+                auto genCmd = ct.generate_cmd();
                 out << "  dir = " << ct.dir().path() << "\n";
-                out << "  cmd = " << ct.generate_cmd() << "\n";
+                out << "  cmd = " << genCmd << "\n";
                 out << "  desc = CUSTOM " << target.name() << "\n\n";
+
+                genCc.add_entry(fs::absolute(ct.dir().path()),
+                                ct.outputs().empty() ? ninja_target_name(target)
+                                                     : std::string{ct.outputs().front()},
+                                std::move(genCmd));
                 break;
             }
             }
         });
+
+    // Default targets — what `ninja` (without arguments) builds.
+    // Tests are intentionally excluded: they only run via `ninja test`.
+    out << "default";
+    for (auto *t : project.top_level_targets())
+        out << " " << ninja_target_name(*t);
+    out << "\n\n";
 
     const auto &install_map = project.installer()->map();
     if (!install_map.empty())
@@ -373,6 +399,7 @@ void generate_build(Project &project)
     out << "\n\n";
 
     out.close();
+    genCc.write();
     std::cout << "Done. Run `ninja` to build.\n";
 }
 

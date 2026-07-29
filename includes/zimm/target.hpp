@@ -2,6 +2,7 @@
 
 #include "definitions.hpp"
 #include "detail/utils.hpp"
+#include "global.hpp"
 #include "path.hpp"
 #include "properties.hpp"
 
@@ -61,9 +62,7 @@ public:
         add_property_impl(m_publicProperties, property);
     }
     void add_property(const PrivateTag *, PropertyObject property)
-    {
-        add_property_impl(m_privateProperties, property);
-    }
+    { add_property_impl(m_privateProperties, property); }
 };
 
 namespace detail
@@ -120,25 +119,17 @@ class SharedLibrary : public Library
 public:
     explicit SharedLibrary(std::string name) noexcept
         : Library(TargetType::SharedLibrary, std::move(name))
-    {
-        add_property(private_, CompileFlagProperty{"-fPIC"});
-    }
+    { add_property(private_, CompileFlagProperty{"-fPIC"}); }
 };
 
 inline LeakyPtr<Executable> make_executable(std::string name)
-{
-    return LeakyPtr<Executable>(new Executable{std::move(name)});
-}
+{ return LeakyPtr<Executable>(new Executable{std::move(name)}); }
 
 inline LeakyPtr<StaticLibrary> make_static_library(std::string name)
-{
-    return LeakyPtr<StaticLibrary>(new StaticLibrary{std::move(name)});
-}
+{ return LeakyPtr<StaticLibrary>(new StaticLibrary{std::move(name)}); }
 
 inline LeakyPtr<SharedLibrary> make_shared_library(std::string name)
-{
-    return LeakyPtr<SharedLibrary>(new SharedLibrary{std::move(name)});
-}
+{ return LeakyPtr<SharedLibrary>(new SharedLibrary{std::move(name)}); }
 
 class ThirdPartyTarget : public Target
 {
@@ -215,8 +206,7 @@ class CustomTarget : public Target, public detail::CustomTargetBase
 public:
     CustomTarget(std::string name)
         : Target(TargetType::CustomTarget, std::move(name)),
-          m_dir(std::string{build_dir()} + std::string{CustomTargetTag::name()} + "_" +
-                std::string{this->name()})
+          m_dir(build_dir() / (CustomTargetTag::name() + "_" + this->name()))
     {
     }
 
@@ -232,8 +222,6 @@ public:
 
 template <CustomTargetTagConcept T>
 inline LeakyPtr<CustomTarget<T>> make_custom_target(std::string name)
-{
-    return LeakyPtr<CustomTarget<T>>(new CustomTarget<T>{std::move(name)});
-}
+{ return LeakyPtr<CustomTarget<T>>(new CustomTarget<T>{std::move(name)}); }
 
 } // namespace zimm

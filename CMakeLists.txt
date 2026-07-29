@@ -1,22 +1,21 @@
 cmake_minimum_required(VERSION 3.20)
 project(zimmermann LANGUAGES CXX)
 
-# Build the zimmermann build-system library itself
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# --- zimmermann library (static) ---
 add_library(zimmermann STATIC
     src/project.cpp
     src/properties.cpp
     src/target.cpp
     src/config.cpp
+    src/gen_cc.cpp
+    src/globals.cpp
 )
-
+target_compile_definitions(zimmermann PRIVATE ZIMM_BUILDING_LIB)
 target_include_directories(zimmermann PUBLIC includes)
 
-# --- Install rules ---
 include(GNUInstallDirs)
 
 install(TARGETS zimmermann

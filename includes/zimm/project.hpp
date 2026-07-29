@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config.hpp"
+#include "global.hpp"
 #include "installer.hpp"
 #include "target.hpp"
 #include "tester.hpp"
@@ -8,10 +9,11 @@
 #include <filesystem>
 #include <optional>
 #include <queue>
-#include <set>
 #include <span>
 #include <stack>
 #include <string>
+#include <source_location>
+#include <iomanip>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -19,6 +21,14 @@
 
 namespace zimm
 {
+
+// global state - updated internally by zimm
+extern std::string prjName_;
+extern std::filesystem::path buildDir_;
+extern std::filesystem::path installDir_;
+extern std::filesystem::path zeBuildCppPath_;
+extern std::filesystem::path projectRootDir_;
+
 class Project
 {
     std::string m_name;
@@ -54,23 +64,36 @@ class Project
         return seen;
     }
 
-public:
-    Project(std::string name, Config config)
-        : m_name(std::move(name)), m_config(std::move(config)), m_buildDir(m_config.build_dir),
-          m_featureDetectionDir(m_config.install_dir), m_installDir(m_buildDir.make("install")),
-          m_installer(m_config.build_dir)
+    class SourceLoc : private std::source_location
     {
+        friend class Project;
+        SourceLoc(std::source_location sl) : std::source_location::source_location(sl) {}
+    };
+
+public:
+    Project(std::string name, Config config, SourceLoc mainFile = std::source_location::current())
+        : m_name(std::move(name)), m_config(std::move(config)),
+          m_featureDetectionDir(m_config.build_dir), m_installer(m_config.build_dir)
+    {
+        // initialize global state
+        if (!prjName_.empty())
+            LOGF("Another project=" << std::quoted(prjName_) << " already initialized");
+
         namespace fs = std::filesystem;
-        fs::create_directories(fs::path{m_buildDir.path()});
+        buildDir_ = m_config.build_dir;
+        installDir_ = m_config.install_dir;
+        zeBuildCppPath_ = fs::path{fs::absolute(mainFile.file_name())};
+        projectRootDir_ = zeBuildCppPath_.parent_path();
+        prjName_ = m_name;
+
+        fs::create_directories(build_dir());
         fs::create_directories(fs::path{m_featureDetectionDir.path()});
     }
 
     std::string_view name() const noexcept { return m_name; }
     const Config &config() const noexcept { return m_config; }
     std::span<const PropertyObject> global_properties() const noexcept
-    {
-        return m_globalProperties;
-    }
+    { return m_globalProperties; }
     Installer *installer() noexcept { return &m_installer; }
     const Installer *installer() const noexcept { return &m_installer; }
 
@@ -78,6 +101,7 @@ public:
     const Tester *tester() const noexcept { return &m_tester; }
 
     void register_top_level_target(Target *target) { m_topLevelTargets.emplace_back(target); }
+    std::span<Target *const> top_level_targets() const noexcept { return m_topLevelTargets; }
     void add_global_property(PropertyObject property) { m_globalProperties.push_back(property); }
 
     auto fold_post_order(auto init, auto foo)
@@ -135,9 +159,7 @@ public:
     std::optional<size_t> check_type_size(std::string type, std::vector<std::string> headers);
 
 private:
-    Directory m_buildDir;
     Directory m_featureDetectionDir;
-    Directory m_installDir;
 
     Installer m_installer;
     Tester m_tester;
