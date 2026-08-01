@@ -3,4 +3,4 @@
 #include "properties.hpp"
 
 // must be included at the end
-#include "install_path.hpp"
+#include "zimm_dir.hpp"

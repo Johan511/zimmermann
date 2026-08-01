@@ -7,7 +7,7 @@
     Must not be included anywhere in the zimm project
     only the final zimm.hpp should include this at the ends
 
-    Why? If we include it anywhere in the zimm project and use zimm_install_path()
+    Why? If we include it anywhere in the zimm project and use zimm_dir()
     It evaluates to the path of the header when that .cpp file was compiled to .o
 
     We do not want that, we don't want it to be in any zimmermann built compilataion unit
@@ -15,14 +15,14 @@
 */
 
 #ifdef ZIMM_BUILDING_LIB
-#error "install_path.hpp must not be included in any zimmermann library translation unit. \
+#error "zimm_dir.hpp must not be included in any zimmermann library translation unit. \
 It may only reach user code through the final zimm.hpp. Do not include it (or zimm.hpp) from src/."
 #endif
 
 namespace zimm
 {
 
-__attribute__((weak)) std::string zimm_install_path()
+__attribute__((weak)) std::string zimm_dir()
 {
     namespace fs = std::filesystem;
     auto loc = std::source_location::current();

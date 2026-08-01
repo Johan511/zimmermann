@@ -72,6 +72,14 @@ EXAMPLES = [
         ],
         "tests": ["test_pass", "test_args"]
     },
+    {
+        "name": "zimm_dir",
+        "binary": "bin/zimm_dir",
+        "expected": ["zimm_dir ok"],
+        "install": [
+            "bin/zimm_dir",
+        ],
+    },
 ]
 
 

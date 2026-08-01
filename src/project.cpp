@@ -16,7 +16,7 @@ namespace fs = std::filesystem;
 namespace zimm
 {
 
-__attribute__((weak)) std::string zimm_install_path();
+__attribute__((weak)) std::string zimm_dir();
 
 std::string_view get_assumed_path(const Target &target)
 {
@@ -185,7 +185,7 @@ void generate_build(Project &project)
     std::string_view zeBuildCpp = project.main_file_path();
     std::string zeBuildCppDir = std::filesystem::path{zeBuildCpp}.parent_path().string();
 
-    std::string zimmIncludePath = (std::filesystem::path{zimm_install_path()} / "include").string();
+    std::string zimmIncludePath = (std::filesystem::path{zimm_dir()} / "include").string();
     std::string compileCmdGuess = std::format("g++ -I{} ze_build.cpp -std=c++23", zimmIncludePath);
 
     genCc.add_entry(std::move(zeBuildCppDir), std::string{zeBuildCpp}, std::move(compileCmdGuess));
