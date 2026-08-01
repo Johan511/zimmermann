@@ -48,7 +48,9 @@ static std::string json_escape(std::string_view s)
 }
 
 void GenCc::add_entry(std::string directory, std::string file, std::string command)
-{ m_entries.emplace_back(std::move(directory), std::move(file), std::move(command)); }
+{
+    m_entries.emplace_back(std::move(directory), std::move(file), std::move(command));
+}
 
 void GenCc::write(std::ofstream &out)
 {

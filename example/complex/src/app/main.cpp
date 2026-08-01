@@ -9,8 +9,7 @@ int main()
     // Use libmath
     math::Vec3 v{3.0, 4.0, 0.0};
     math::print(v);
-    core::log(core::Level::Info,
-              std::format("Vector length: {:.2f}", v.length()));
+    core::log(core::Level::Info, std::format("Vector length: {:.2f}", v.length()));
 
     // Use libnetwork (which also uses libcore)
     network::Socket sock({"localhost", 8080});

@@ -24,7 +24,9 @@ inline std::string get_absolute_path(std::string_view path, std::source_location
 
 static inline std::string rel_path(std::string relPath,
                                    std::source_location loc = std::source_location::current())
-{ return detail::get_absolute_path(relPath, loc); }
+{
+    return detail::get_absolute_path(relPath, loc);
+}
 
 class Directory
 {
@@ -33,7 +35,10 @@ class Directory
 public:
     Directory(std::string dirPath) : m_dirPath(std::move(dirPath))
     {
-        if (m_dirPath.empty()) { LOGF("dirPath provided is empty"); }
+        if (m_dirPath.empty())
+        {
+            LOGF("dirPath provided is empty");
+        }
         if (m_dirPath.back() != '/') m_dirPath.push_back('/');
     }
     std::string_view path() const noexcept { return m_dirPath; }

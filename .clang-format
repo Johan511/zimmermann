@@ -3,7 +3,6 @@ ColumnLimit: 100
 IndentWidth: 4
 BreakTemplateDeclarations: Yes
 RequiresClausePosition: WithPreceding
-AllowShortBlocksOnASingleLine: Always
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AllowShortLambdasOnASingleLine: All
 AllowShortLoopsOnASingleLine: TRUE

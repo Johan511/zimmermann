@@ -1,7 +1,7 @@
 #include "src/libcore/ze_build.hpp"
+#include "src/app/ze_build.hpp"
 #include "src/libmath/ze_build.hpp"
 #include "src/libnetwork/ze_build.hpp"
-#include "src/app/ze_build.hpp"
 
 #include <print>
 

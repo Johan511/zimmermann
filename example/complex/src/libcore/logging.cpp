@@ -10,10 +10,14 @@ void log(Level level, std::string_view message)
     {
         switch (l)
         {
-        case Level::Debug: return "[DEBUG]";
-        case Level::Info: return "[INFO]";
-        case Level::Warning: return "[WARN]";
-        case Level::Error: return "[ERROR]";
+        case Level::Debug:
+            return "[DEBUG]";
+        case Level::Info:
+            return "[INFO]";
+        case Level::Warning:
+            return "[WARN]";
+        case Level::Error:
+            return "[ERROR]";
         }
         return "[???]";
     };

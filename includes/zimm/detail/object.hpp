@@ -24,7 +24,10 @@ public:
     Object(const Object &other) : m_impl(other.m_impl ? other.m_impl->clone() : nullptr) {}
     Object &operator=(const Object &other)
     {
-        if (this != &other) { m_impl = other.m_impl ? other.m_impl->clone() : nullptr; }
+        if (this != &other)
+        {
+            m_impl = other.m_impl ? other.m_impl->clone() : nullptr;
+        }
         return *this;
     }
 
