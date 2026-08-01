@@ -14,7 +14,7 @@ struct Config
 
     // TODO: this seems janky, install/build should be wrt project root, figure out how to manage it
     std::string build_dir{std::filesystem::current_path().string()};
-    std::string install_dir{(std::filesystem::current_path() / "install").string()};
+    std::string install_dir{(std::filesystem::current_path().parent_path() / "install").string()};
     std::string compile_commands_path{std::filesystem::path{build_dir} / "compile_commands.json"};
 
     std::string flags_debug{""};          // flags for debug build

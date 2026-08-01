@@ -1,0 +1,437 @@
+#include "../includes/zimm/project.hpp"
+#include "../includes/zimm/properties.hpp"
+#include "../includes/zimm/target.hpp"
+#include "gen_cc.hpp"
+#include <fstream>
+#include <queue>
+
+namespace fs = std::filesystem;
+
+namespace zimm
+{
+__attribute__((weak)) std::string zimm_dir();
+
+namespace
+{
+std::string_view get_assumed_path(const Target &target)
+{
+    for (auto &pobj : target.private_properties())
+        if (pobj->type() == PropertyType::AssumedProperty)
+            return static_cast<const AssumedProperty &>(*pobj).path();
+    return "";
+};
+
+std::string ninja_target_name(const Target &target)
+{
+    switch (target.type())
+    {
+    case TargetType::Executable:
+        return std::string{target.name()};
+    case TargetType::StaticLibrary:
+        return std::format("{}.a", target.name());
+    case TargetType::SharedLibrary:
+        return std::format("lib{}.so", target.name());
+    case TargetType::ThirdPartyTarget:
+        return std::format("{}_tpt", target.name());
+    case TargetType::CustomTarget:
+        return std::format("{}_ct", target.name());
+    }
+    return "Unknown";
+}
+
+std::string get_compile_flags(std::span<const PropertyObject> props)
+{
+    std::ostringstream oss;
+    for (const auto &prop : props)
+    {
+        if (prop->type() == PropertyType::Include)
+            oss << "-I" << static_cast<const IncludeProperty &>(*prop).include_path() << " ";
+        else if (prop->type() == PropertyType::CompileFlag)
+            oss << static_cast<const CompileFlagProperty &>(*prop).flag() << " ";
+    }
+    return std::move(oss).str();
+}
+
+std::string get_link_flags(std::span<const PropertyObject> props)
+{
+    std::ostringstream oss;
+    for (const auto &prop : props)
+    {
+        if (prop->type() == PropertyType::LinkFlag)
+            oss << static_cast<const LinkFlagProperty &>(*prop).flag();
+    }
+    return std::move(oss).str();
+}
+
+std::string get_deps_list(const Target &target)
+{
+    std::ostringstream oss;
+    for (const auto *dep : target.dependencies()) oss << ninja_target_name(*dep) << ' ';
+    return std::move(oss.str());
+}
+
+std::string get_link_sources(std::span<const PropertyObject> props)
+{
+    std::ostringstream oss;
+    for (const auto &prop : props)
+    {
+        if (prop->type() != PropertyType::LinkTarget) continue;
+        oss << ninja_target_name(*static_cast<const LinkTargetProperty &>(*prop).link_lib()) << " ";
+    }
+    return std::move(oss).str();
+}
+
+std::string ninja_target_name(std::string_view fileAbsPath /* cxx or c file */)
+{
+    std::string objectFilePath{fileAbsPath};
+    objectFilePath += ".o";
+    for (auto &c : objectFilePath)
+        if (c == '/') c = '_';
+    return objectFilePath;
+}
+
+std::string test_name(const detail::Test &test)
+{
+    std::ostringstream oss;
+    oss << test.exec->name();
+    oss << test.conflatedArgs;
+
+    std::string testName = std::move(oss).str();
+    for (auto &c : testName)
+        if (!std::isalpha(static_cast<unsigned char>(c))) c = '_';
+    return testName;
+}
+
+std::vector<Target *> top_sort_all_targets(std::ranges::range auto &&allTargets)
+{
+    std::queue<Target *> visitQueue;
+    std::unordered_map<Target *, size_t> inDegreeMap;
+
+    for (Target *t : allTargets)
+    {
+        auto numDeps = t->dependencies().size();
+        if (numDeps == 0) visitQueue.push(t);
+        inDegreeMap[t] = numDeps;
+    }
+
+    std::vector<Target *> topologicalOrder;
+    while (!visitQueue.empty())
+    {
+        auto front = visitQueue.front();
+        visitQueue.pop();
+
+        topologicalOrder.push_back(front);
+        for (Target *dependent : front->dependents())
+            if (--inDegreeMap[dependent] == 0) visitQueue.push(dependent);
+    }
+
+    if (topologicalOrder.size() != allTargets.size()) LOGF("fold failed because graph has cycles");
+    return topologicalOrder;
+}
+} // namespace
+
+void generate_build(Project &project)
+{
+    auto topSortedTargets = top_sort_all_targets(project.seach_all_targets());
+
+    for (auto tRef : topSortedTargets)
+    {
+        Target &t = *tRef;
+        for (auto dep : t.dependencies())
+            for (auto p : dep->public_properties()) t.add_property(public_, p);
+    }
+
+    for (auto t : topSortedTargets)
+    {
+        if (t->type() != TargetType::ThirdPartyTarget) continue;
+        auto &tpt = static_cast<const ThirdPartyTarget &>(*t);
+        auto metaCmd = tpt.meta_build_cmd();
+        if (metaCmd.empty()) continue;
+
+        std::string metaStamp = std::format("{}.meta.stamp", t->name());
+        if (fs::exists(metaStamp)) continue;
+
+        fs::create_directories(fs::path{tpt.build_dir()});
+        std::string cmd =
+            std::format("cd {} && {} && touch {}", tpt.build_dir(), metaCmd, metaStamp);
+        if (std::system(cmd.c_str()) != 0)
+            LOGF("Warning: meta-build step for '" << tpt.name() << "' failed");
+    }
+
+    std::string ninja = "build.ninja";
+    std::ofstream out(ninja);
+    if (!out) LOGF("Error: could not open " << ninja << " for writing");
+
+    out << "# Generated by zimm — do not edit by hand\n";
+    out << "ninja_required_version = 1.10\n\n";
+
+    const auto &config = project.config();
+
+    std::string gxx = config.toolchain_prefix + "g++";
+    std::string gcc = config.toolchain_prefix + "gcc";
+    std::string ar = config.toolchain_prefix + "ar";
+    std::string ld = config.toolchain_prefix + "g++";
+
+    out << "rule cxx\n";
+    out << "  command = " << gxx << " -MD -MT $out -MF $out.d -c $in -o $out $flags\n";
+    out << "  depfile = $out.d\n";
+    out << "  deps = gcc\n";
+    out << "  description = CXX $out\n\n";
+
+    out << "rule cc\n";
+    out << "  command = " << gcc << " -MD -MT $out -MF $out.d -c $in -o $out $flags\n";
+    out << "  depfile = $out.d\n";
+    out << "  deps = gcc\n";
+    out << "  description = CC $out\n\n";
+
+    out << "rule ar\n";
+    out << "  command = " << ar << " rcs $out $in\n";
+    out << "  description = AR $out\n\n";
+
+    out << "rule link\n";
+    out << "  command = " << ld << " $in -o $out $ldflags\n";
+    out << "  description = LINK $out\n\n";
+
+    out << "rule run_cmd\n";
+    out << "  command = (cd $dir && $cmd) && touch $out\n";
+    out << "  description = $desc\n\n";
+
+    out << "rule assumed_target\n";
+    out << "  command = true\n";
+    out << "  description = assumed target stub\n\n";
+
+    std::string globalCompileFlags = get_compile_flags(project.global_properties());
+    std::string globalLinkFlags = get_link_flags(project.global_properties());
+
+    GenCc genCc;
+
+    std::string_view zeBuildCpp = project.main_file_path();
+    std::string zeBuildCppDir = std::filesystem::path{zeBuildCpp}.parent_path().string();
+
+    std::string zimmIncludePath = (std::filesystem::path{zimm_dir()} / "include").string();
+    std::string compileCmdGuess = std::format("g++ -I{} ze_build.cpp -std=c++23", zimmIncludePath);
+
+    genCc.add_entry(std::move(zeBuildCppDir), std::string{zeBuildCpp}, std::move(compileCmdGuess));
+
+    for (const auto *targetPtr : topSortedTargets)
+    {
+        const Target &target = *targetPtr;
+        auto assumedPath = get_assumed_path(target);
+        auto depList = get_deps_list(target);
+        auto ninjaName = ninja_target_name(target);
+
+        std::string localCompileFlags = get_compile_flags(target.public_properties()) + " " +
+                                        get_compile_flags(target.private_properties());
+
+        std::string localLinkFlags = get_link_flags(target.public_properties()) + " " +
+                                     get_link_flags(target.private_properties());
+
+        // is an assumed target
+        if (!assumedPath.empty())
+        {
+            out << "build " << assumedPath << ": assumed_target\n\n";
+            continue;
+        }
+
+        std::string sourceObjectsNinjaNames;
+        bool depsEnsured = false;
+        if (auto sourcesPtr = dynamic_cast<const detail::Sources *>(targetPtr))
+        {
+            std::vector<std::string> objectNinjaNames;
+            for (std::string_view src : sourcesPtr->sources())
+            {
+                depsEnsured = true;
+                bool isCxx = utils::is_cxx_source(src);
+                std::string_view rule = isCxx ? "cxx" : "cc";
+                std::string objectNinjaName = ninja_target_name(src);
+                out << "build " << objectNinjaName << ": " << rule << " " << src << " | " << depList
+                    << '\n';
+                sourceObjectsNinjaNames += " " + objectNinjaName;
+
+                std::string flags = globalCompileFlags;
+                flags += " " + localCompileFlags;
+                flags += " " + (isCxx ? config.cxx_flags : config.c_flags);
+                out << "  flags = " << flags << "\n\n";
+
+                genCc.add_entry(std::string{project.build_dir()}, std::string{src},
+                                std::format("{} -MD -MT {} -MF {}.d -c {} -o {} {}",
+                                            isCxx ? gxx : gcc, objectNinjaName, objectNinjaName,
+                                            src, objectNinjaName, flags));
+            }
+        }
+
+        std::string linkSourcesNinjaNames = get_link_sources(target.public_properties()) +
+                                            get_link_sources(target.private_properties());
+
+        switch (target.type())
+        {
+        case TargetType::StaticLibrary:
+        {
+            auto &lib = static_cast<const StaticLibrary &>(target);
+            out << "build " << ninja_target_name(lib) << ": ar " << sourceObjectsNinjaNames << " "
+                << linkSourcesNinjaNames;
+            if (!depsEnsured) out << " | " << depList;
+            out << "\n\n";
+            break;
+        }
+        case TargetType::SharedLibrary:
+        {
+            auto &lib = static_cast<const SharedLibrary &>(target);
+            out << "build " << ninja_target_name(lib) << ": link " << sourceObjectsNinjaNames << " "
+                << linkSourcesNinjaNames;
+            if (!depsEnsured) out << " | " << depList;
+            out << '\n';
+            out << "  ldflags = -shared " << globalLinkFlags << " " << localLinkFlags << "\n\n";
+            break;
+        }
+        case TargetType::Executable:
+        {
+            auto &exec = static_cast<const Executable &>(target);
+            out << "build " << ninja_target_name(exec) << ": link " << sourceObjectsNinjaNames
+                << " " << linkSourcesNinjaNames;
+            if (!depsEnsured) out << " | " << depList;
+            out << '\n';
+            out << "  ldflags = " << globalLinkFlags << " " << localLinkFlags << "\n\n";
+            break;
+        }
+        case TargetType::ThirdPartyTarget:
+        {
+            auto &tpt = static_cast<const ThirdPartyTarget &>(target);
+            auto build = tpt.build_cmd();
+            if (build.empty()) build = "true";
+
+            // Third Party Target is not expected to have sources
+            if (depsEnsured) LOGF("Why does Third Party Target have sources?");
+            out << "build " << ninja_target_name(tpt) << ": run_cmd | " << depList << "\n";
+
+            // Directory already created before executing meta command
+            out << "  dir = " << tpt.build_dir() << "\n";
+            out << "  cmd = " << build << "\n";
+            out << "  desc = BUILD " << tpt.name() << "\n\n";
+
+            genCc.add_entry(fs::absolute(tpt.build_dir()), ninja_target_name(tpt),
+                            std::string{build});
+            break;
+        }
+        case TargetType::CustomTarget:
+        {
+            auto &ct = dynamic_cast<const detail::CustomTargetBase &>(target);
+            fs::create_directories(fs::path{ct.dir().path()});
+
+            out << "build";
+            for (auto &o : ct.outputs()) out << " " << o;
+            out << " " << ninja_target_name(target);
+            out << ": run_cmd";
+            for (auto &i : ct.inputs()) out << " " << i;
+            out << " | " << depList << "\n";
+
+            // Third Party Target is not expected to have sources
+            if (depsEnsured) LOGF("Why does Third Party Target have sources?");
+
+            auto genCmd = ct.generate_cmd();
+            out << "  dir = " << ct.dir().path() << "\n";
+            out << "  cmd = " << genCmd << "\n";
+            out << "  desc = CUSTOM " << target.name() << "\n\n";
+
+            genCc.add_entry(fs::absolute(ct.dir().path()),
+                            ct.outputs().empty() ? ninja_target_name(target)
+                                                 : std::string{ct.outputs().front()},
+                            std::move(genCmd));
+            break;
+        }
+        }
+    }
+
+    // Default targets — what `ninja` (without arguments) builds.
+    // Tests are intentionally excluded: they only run via `ninja test`.
+    out << "default";
+    for (auto *t : project.top_level_targets()) out << " " << ninja_target_name(*t);
+    out << "\n\n";
+
+    const auto &install_map = project.installer().map();
+    if (!install_map.empty())
+    {
+        std::string install_dir = config.install_dir;
+
+        out << "\n# --- Install rules ---\n\n";
+        out << "rule install_file\n";
+        out << "  command = install -D $in $out\n";
+        out << "  description = INSTALL $out\n\n";
+
+        out << "rule install_tree\n";
+        out << "  command = mkdir -p $dest && cp -r $dir/. $dest/\n";
+        out << "  description = INSTALL $dir -> $dest\n\n";
+
+        // Emit per-file install edges first, collecting phony targets.
+        std::vector<std::string> phony_targets;
+
+        for (auto &[rel_dest, sources] : install_map)
+        {
+            for (size_t i = 0; i < sources.size(); ++i)
+            {
+                auto &src = sources[i];
+                if (src.back() == '/')
+                {
+                    // directory source → tree copy
+                    std::string target = "install_" + rel_dest + "_" + std::to_string(i);
+                    phony_targets.push_back(target);
+                    out << "build " << target << ": install_tree\n";
+                    out << "  dir = " << src << "\n";
+                    out << "  dest = " << (fs::path(install_dir) / rel_dest).string() << "\n";
+                }
+                else
+                {
+                    // file source → single copy
+                    std::string filename = fs::path(src).filename().string();
+                    std::string dest = (fs::path(install_dir) / rel_dest / filename).string();
+                    phony_targets.push_back(dest);
+                    out << "build " << dest << ": install_file " << filename << "\n";
+                }
+            }
+        }
+
+        // Emit the `install` phony target pointing at everything above.
+        out << "build install: phony";
+        for (auto &t : phony_targets) out << " " << t;
+        out << "\n\n";
+    }
+
+    // TODO: ninja test <args> -> calls executable with args
+    out << "\n# --- Test rules ---\n\n";
+    out << "rule run_test\n";
+    out << "  command = $cmd > $name.stdout 2> $name.stderr && ";
+    out << "echo \"SUCCESS: $name\" || (echo \"FAILURE: $name\" && exit 1)\n";
+    out << "  description = TEST $name\n\n";
+
+    // maps from executable name to tests
+    std::unordered_map<std::string, std::vector<const detail::Test *>> testMap;
+
+    for (const auto &test : project.tester().tests())
+    {
+        auto testName = test_name(test);
+        std::string execName{test.exec->name()};
+        out << "build " << testName << ".test.stamp: run_test | " << execName << "\n";
+        out << "  name = " << testName << "\n";
+        out << "  cmd = ./" << ninja_target_name(*test.exec) << ' ' << test.conflatedArgs;
+        out << "\n\n";
+
+        testMap[execName].push_back(&test);
+    }
+
+    for (const auto &[execName, tests] : testMap)
+    {
+        out << "build test-" << execName << ": phony";
+        for (const auto *test : tests) out << " " << test_name(*test) << ".test.stamp";
+        out << "\n\n";
+    }
+
+    out << "build test: phony";
+    for (const auto &[execName, _] : testMap) out << " test-" << execName;
+    out << "\n\n";
+
+    out.close();
+    std::ofstream ccFile(config.compile_commands_path);
+    genCc.write(ccFile);
+    std::cout << "Done. Run `ninja` to build.\n";
+}
+} // namespace zimm

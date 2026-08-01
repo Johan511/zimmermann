@@ -11,6 +11,7 @@ add_library(zimmermann STATIC
     src/target.cpp
     src/config.cpp
     src/gen_cc.cpp
+    src/generate_build.cpp
 )
 target_compile_definitions(zimmermann PRIVATE ZIMM_BUILDING_LIB)
 target_include_directories(zimmermann PUBLIC includes)
