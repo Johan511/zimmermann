@@ -28,6 +28,8 @@ struct Config
 
     std::string os{"Linux"};
     std::string hardware{"x86_64"};
+
+    std::unordered_map<std::string, std::string> misc;
 };
 
 std::optional<Config> make_config(int argc, char *argv[]);

@@ -1,6 +1,6 @@
-#include <zimm/zimm.hpp>
 #include <filesystem>
 #include <iostream>
+#include <zimm/zimm.hpp>
 
 using namespace zimm;
 
@@ -22,7 +22,7 @@ int main()
         return 1;
     }
 
-    Project prj{"zimm_dir", Config{.install_dir = "install"};};
+    Project prj { "zimm_dir", Config{.install_dir = "install"}; };
 
     auto exec = make_executable("zimm_dir");
     exec->add_source(rel_path("main.cpp"));

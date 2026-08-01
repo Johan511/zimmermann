@@ -97,6 +97,7 @@ try
         else if (key == "toolchain_prefix") cfg.toolchain_prefix = value;
         else if (key == "os") cfg.os = value;
         else if (key == "hardware") cfg.hardware = value;
+        else cfg.misc[std::string{key}] = value;
     }
     return cfg;
 }
