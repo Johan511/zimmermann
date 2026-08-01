@@ -2,7 +2,6 @@
 
 #include "definitions.hpp"
 #include "detail/utils.hpp"
-#include "global.hpp"
 #include "path.hpp"
 #include "properties.hpp"
 
@@ -204,9 +203,8 @@ class CustomTarget : public Target, public detail::CustomTargetBase
     Directory m_dir;
 
 public:
-    CustomTarget(std::string name)
-        : Target(TargetType::CustomTarget, std::move(name)),
-          m_dir(build_dir() / (CustomTargetTag::name() + "_" + this->name()))
+    CustomTarget(std::string name, Directory dir)
+        : Target(TargetType::CustomTarget, std::move(name)), m_dir(std::move(dir))
     {
     }
 

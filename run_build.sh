@@ -26,6 +26,10 @@ cmake --build "$BUILD_DIR" --parallel "$(nproc)"
 echo "==> Installing to $INSTALL_DIR..."
 cmake --install "$BUILD_DIR"
 
+# --- Make installed files read-only ---
+echo "==> Setting installed files to read-only..."
+chmod -R a-w "$INSTALL_DIR"
+
 # --- Package ---
 echo "==> Packaging..."
 cd "$BUILD_DIR"

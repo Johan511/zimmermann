@@ -18,9 +18,8 @@ class GenCc
     std::vector<CCEntry> m_entries;
 
 public:
-    GenCc();
     void add_entry(std::string directory, std::string file, std::string command);
-    void write();
+    void write(std::ofstream &ofs);
 };
 
 } // namespace zimm

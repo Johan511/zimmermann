@@ -1,7 +1,6 @@
 #pragma once
 
 #include "config.hpp"
-#include "global.hpp"
 #include "installer.hpp"
 #include "target.hpp"
 #include "tester.hpp"
@@ -9,11 +8,10 @@
 #include <filesystem>
 #include <optional>
 #include <queue>
+#include <source_location>
 #include <span>
 #include <stack>
 #include <string>
-#include <source_location>
-#include <iomanip>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -21,13 +19,6 @@
 
 namespace zimm
 {
-
-// global state - updated internally by zimm
-extern std::string prjName_;
-extern std::filesystem::path buildDir_;
-extern std::filesystem::path installDir_;
-extern std::filesystem::path zeBuildCppPath_;
-extern std::filesystem::path projectRootDir_;
 
 class Project
 {
@@ -73,36 +64,29 @@ class Project
 public:
     Project(std::string name, Config config, SourceLoc mainFile = std::source_location::current())
         : m_name(std::move(name)), m_config(std::move(config)),
-          m_featureDetectionDir(m_config.build_dir), m_installer(m_config.build_dir)
+          m_featureDetectionDir(m_config.build_dir), m_installer(m_config.build_dir),
+          m_mainFilePath(mainFile.file_name())
     {
-        // initialize global state
-        if (!prjName_.empty())
-            LOGF("Another project=" << std::quoted(prjName_) << " already initialized");
-
         namespace fs = std::filesystem;
-        buildDir_ = m_config.build_dir;
-        installDir_ = m_config.install_dir;
-        zeBuildCppPath_ = fs::path{fs::absolute(mainFile.file_name())};
-        projectRootDir_ = zeBuildCppPath_.parent_path();
-        prjName_ = m_name;
 
-        fs::create_directories(build_dir());
+        fs::create_directories(m_config.build_dir);
         fs::create_directories(fs::path{m_featureDetectionDir.path()});
     }
 
+    // clang-format off
     std::string_view name() const noexcept { return m_name; }
     const Config &config() const noexcept { return m_config; }
-    std::span<const PropertyObject> global_properties() const noexcept
-    { return m_globalProperties; }
+    std::span<const PropertyObject> global_properties() const noexcept { return m_globalProperties; }
+    std::string_view main_file_path() const noexcept { return m_mainFilePath; }
     Installer *installer() noexcept { return &m_installer; }
-    const Installer *installer() const noexcept { return &m_installer; }
-
     Tester *tester() noexcept { return &m_tester; }
-    const Tester *tester() const noexcept { return &m_tester; }
 
     void register_top_level_target(Target *target) { m_topLevelTargets.emplace_back(target); }
     std::span<Target *const> top_level_targets() const noexcept { return m_topLevelTargets; }
     void add_global_property(PropertyObject property) { m_globalProperties.push_back(property); }
+    // clang-format on
+
+    std::string_view build_dir() { return m_config.build_dir; }
 
     auto fold_post_order(auto init, auto foo)
     {
@@ -163,6 +147,8 @@ private:
 
     Installer m_installer;
     Tester m_tester;
+
+    std::string m_mainFilePath;
 };
 
 void generate_build(Project &project);

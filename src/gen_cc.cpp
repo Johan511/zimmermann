@@ -1,5 +1,4 @@
 #include "gen_cc.hpp"
-#include "../includes/zimm/global.hpp"
 #include "../includes/zimm/logger.hpp"
 #include <filesystem>
 #include <format>
@@ -51,9 +50,8 @@ static std::string json_escape(std::string_view s)
 void GenCc::add_entry(std::string directory, std::string file, std::string command)
 { m_entries.emplace_back(std::move(directory), std::move(file), std::move(command)); }
 
-void GenCc::write()
+void GenCc::write(std::ofstream &out)
 {
-    std::ofstream out(build_dir() / "compile_commands.json");
     if (!out) LOGF("Error: could not open compile_commands.json for writing");
 
     out << "[\n";
@@ -70,22 +68,4 @@ void GenCc::write()
     }
     out << "]\n";
 }
-
-__attribute__((weak)) std::string zimm_install_path();
-GenCc::GenCc()
-{
-    // add ze_build.cpp itself to the compile_commands too
-    /*
-        TODO: we need some way to figure out the compile command the user used to compile zimm
-        For now we are simply guessing it to allow for clangd completions
-    */
-    std::string zeBuildCpp = ze_build_cpp_path();
-    std::string zeBuildCppDir = std::filesystem::path{zeBuildCpp}.parent_path().string();
-
-    std::string zimmIncludePath = (std::filesystem::path{zimm_install_path()} / "include").string();
-    std::string compileCmdGuess = std::format("g++ -I{} ze_build.cpp -std=c++23", zimmIncludePath);
-
-    add_entry(std::move(zeBuildCppDir), std::move(zeBuildCpp), std::move(compileCmdGuess));
-}
-
 } // namespace zimm

@@ -16,6 +16,8 @@ namespace fs = std::filesystem;
 namespace zimm
 {
 
+__attribute__((weak)) std::string zimm_install_path();
+
 std::string_view get_assumed_path(const Target &target)
 {
     for (auto &pobj : target.private_properties())
@@ -180,6 +182,14 @@ void generate_build(Project &project)
 
     GenCc genCc;
 
+    std::string_view zeBuildCpp = project.main_file_path();
+    std::string zeBuildCppDir = std::filesystem::path{zeBuildCpp}.parent_path().string();
+
+    std::string zimmIncludePath = (std::filesystem::path{zimm_install_path()} / "include").string();
+    std::string compileCmdGuess = std::format("g++ -I{} ze_build.cpp -std=c++23", zimmIncludePath);
+
+    genCc.add_entry(std::move(zeBuildCppDir), std::string{zeBuildCpp}, std::move(compileCmdGuess));
+
     project.fold_post_order(
         [&](const Target *targetPtr) -> void
         {
@@ -221,7 +231,7 @@ void generate_build(Project &project)
                     flags += " " + (isCxx ? config.cxx_flags : config.c_flags);
                     out << "  flags = " << flags << "\n\n";
 
-                    genCc.add_entry(build_dir(), std::string{src},
+                    genCc.add_entry(std::string{project.build_dir()}, std::string{src},
                                     std::format("{} -MD -MT {} -MF {}.d -c {} -o {} {}",
                                                 isCxx ? gxx : gcc, objectNinjaName, objectNinjaName,
                                                 src, objectNinjaName, flags));
@@ -313,8 +323,7 @@ void generate_build(Project &project)
     // Default targets — what `ninja` (without arguments) builds.
     // Tests are intentionally excluded: they only run via `ninja test`.
     out << "default";
-    for (auto *t : project.top_level_targets())
-        out << " " << ninja_target_name(*t);
+    for (auto *t : project.top_level_targets()) out << " " << ninja_target_name(*t);
     out << "\n\n";
 
     const auto &install_map = project.installer()->map();
@@ -399,7 +408,8 @@ void generate_build(Project &project)
     out << "\n\n";
 
     out.close();
-    genCc.write();
+    std::ofstream ccFile(config.compile_commands_path);
+    genCc.write(ccFile);
     std::cout << "Done. Run `ninja` to build.\n";
 }
 
