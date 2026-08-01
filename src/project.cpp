@@ -326,7 +326,7 @@ void generate_build(Project &project)
     for (auto *t : project.top_level_targets()) out << " " << ninja_target_name(*t);
     out << "\n\n";
 
-    const auto &install_map = project.installer()->map();
+    const auto &install_map = project.installer().map();
     if (!install_map.empty())
     {
         std::string install_dir = config.install_dir;
@@ -384,7 +384,7 @@ void generate_build(Project &project)
     // maps from executable name to tests
     std::unordered_map<std::string, std::vector<const detail::Test *>> testMap;
 
-    for (const auto &test : project.tester()->tests())
+    for (const auto &test : project.tester().tests())
     {
         auto testName = test_name(test);
         std::string execName{test.exec->name()};

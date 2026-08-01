@@ -78,8 +78,8 @@ public:
     const Config &config() const noexcept { return m_config; }
     std::span<const PropertyObject> global_properties() const noexcept { return m_globalProperties; }
     std::string_view main_file_path() const noexcept { return m_mainFilePath; }
-    Installer *installer() noexcept { return &m_installer; }
-    Tester *tester() noexcept { return &m_tester; }
+    Installer &installer() noexcept { return m_installer; }
+    Tester &tester() noexcept { return m_tester; }
 
     void register_top_level_target(Target *target) { m_topLevelTargets.emplace_back(target); }
     std::span<Target *const> top_level_targets() const noexcept { return m_topLevelTargets; }

@@ -9,8 +9,8 @@ namespace zimm
 {
 struct Config
 {
-    std::string c_flags;   // Inject C flags
-    std::string cxx_flags; // Inject C++ flags
+    std::string c_flags{};   // Inject C flags
+    std::string cxx_flags{}; // Inject C++ flags
 
     // TODO: this seems janky, install/build should be wrt project root, figure out how to manage it
     std::string build_dir{std::filesystem::current_path().string()};
@@ -29,7 +29,7 @@ struct Config
     std::string os{"Linux"};
     std::string hardware{"x86_64"};
 
-    std::unordered_map<std::string, std::string> misc;
+    std::unordered_map<std::string, std::string> misc{};
 };
 
 std::optional<Config> make_config(int argc, char *argv[]);

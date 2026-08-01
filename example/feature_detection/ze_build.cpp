@@ -44,6 +44,6 @@ int main()
         app->add_property(private_, CompileFlagProperty{"-DPTR_SIZE=" + std::to_string(*sz)});
 
     prj.register_top_level_target(app.get());
-    prj.installer()->install_binary(app.get());
+    prj.installer().install_binary(app.get());
     generate_build(prj);
 }

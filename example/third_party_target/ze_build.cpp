@@ -35,7 +35,7 @@ int main()
     add_dependency_rel(app.get(), gen.get());
 
     prj.register_top_level_target(app.get());
-    prj.installer()->install_binary(app.get());
+    prj.installer().install_binary(app.get());
 
     generate_build(prj);
 }

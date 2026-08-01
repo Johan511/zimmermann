@@ -15,11 +15,11 @@ int main()
 
     prj.register_top_level_target(helloWorld.get());
 
-    prj.installer()->install_binary(helloWorld.get());
-    prj.installer()->install_headers(Directory{rel_path("include")});
+    prj.installer().install_binary(helloWorld.get());
+    prj.installer().install_headers(Directory{rel_path("include")});
 
-    Tester *tester = prj.tester();
-    tester->add_test(helloWorld.get());
+    Tester &tester = prj.tester();
+    tester.add_test(helloWorld.get());
 
     generate_build(prj);
 }

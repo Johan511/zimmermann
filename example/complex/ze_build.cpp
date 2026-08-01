@@ -24,9 +24,9 @@ int main()
     prj.register_top_level_target(myapp.get());
     prj.register_top_level_target(libnetwork.get());
 
-    prj.installer()->install_binary(myapp.get());
-    prj.installer()->install_lib(libnetwork.get());
-    prj.installer()->install_headers(Directory{rel_path("include")});
+    prj.installer().install_binary(myapp.get());
+    prj.installer().install_lib(libnetwork.get());
+    prj.installer().install_headers(Directory{rel_path("include")});
 
     generate_build(prj);
     std::println("Generated build.ninja for project '{}'", prj.name());
