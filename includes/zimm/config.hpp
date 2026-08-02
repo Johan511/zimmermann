@@ -7,6 +7,7 @@
 
 namespace zimm
 {
+
 struct Config
 {
     std::string c_flags{};   // Inject C flags
@@ -26,8 +27,8 @@ struct Config
     // prefix used to figure out tools like gcc, g++, ar, ld, ldd, ...
     std::string toolchain_prefix{""};
 
-    std::string os{"Linux"};
-    std::string hardware{"x86_64"};
+    std::string os{};
+    std::string hardware{};
 
     std::unordered_map<std::string, std::string> misc{};
 };

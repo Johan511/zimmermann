@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(zimmermann LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -13,7 +15,11 @@ add_library(zimmermann STATIC
     src/gen_cc.cpp
     src/generate_build.cpp
 )
-target_compile_definitions(zimmermann PRIVATE ZIMM_BUILDING_LIB)
+target_compile_definitions(zimmermann PRIVATE
+    ZIMM_BUILDING_LIB
+    CMAKE_HOST_OS="${CMAKE_HOST_SYSTEM_NAME}"
+    CMAKE_HOST_HARDWARE="${CMAKE_HOST_SYSTEM_PROCESSOR}"
+)
 target_include_directories(zimmermann PUBLIC includes)
 
 include(GNUInstallDirs)

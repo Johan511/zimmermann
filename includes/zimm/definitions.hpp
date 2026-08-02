@@ -5,7 +5,6 @@
 namespace zimm
 {
 constexpr class PublicTag *public_ = nullptr;
-constexpr class ProtectedTag *protected_ = nullptr;
 constexpr class PrivateTag *private_ = nullptr;
 
 class Property;

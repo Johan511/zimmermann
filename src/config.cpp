@@ -6,7 +6,8 @@
 
 namespace zimm
 {
-
+namespace
+{
 struct ArgsParser
 {
     int argc;
@@ -46,6 +47,25 @@ struct ArgsParser
     iterator begin() const { return iterator(*this); }
     std::default_sentinel_t end() const { return {}; }
 };
+
+std::string_view resolve_host_os()
+{
+#ifndef CMAKE_HOST_OS
+#error CMAKE_HOST_OS not defined;
+#else
+    return CMAKE_HOST_OS;
+#endif
+}
+
+std::string_view resolve_host_hardware()
+{
+#ifndef CMAKE_HOST_HARDWARE
+#error CMAKE_HOST_HARDWARE not defined;
+#else
+    return CMAKE_HOST_HARDWARE;
+#endif
+}
+} // namespace
 
 std::optional<Config> make_config(int argc, char *argv[])
 try
@@ -99,6 +119,10 @@ try
         else if (key == "hardware") cfg.hardware = value;
         else cfg.misc[std::string{key}] = value;
     }
+
+    if (cfg.os.empty()) cfg.os = resolve_host_os();
+    if (cfg.hardware.empty()) cfg.hardware = resolve_host_hardware();
+
     return cfg;
 }
 catch (...)

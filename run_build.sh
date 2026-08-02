@@ -22,6 +22,9 @@ cmake -S "$PROJECT_ROOT" \
 echo "==> Building..."
 cmake --build "$BUILD_DIR" --parallel "$(nproc)"
 
+chmod -R a+w "$INSTALL_DIR"
+rm -rf "$INSTALL_DIR"
+
 # --- Install ---
 echo "==> Installing to $INSTALL_DIR..."
 cmake --install "$BUILD_DIR"
