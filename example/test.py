@@ -104,7 +104,7 @@ def build_zimm(test_dir: str) -> str | None:
     ze_bin = os.path.join(build_dir, "ze_build")
     cmd = [
         "g++", source,
-        "-std=c++23",
+        "-std=c++20",
         "-g",
         f"-I{includes}",
         f"-L{lib_dir}", "-lzimmermann",

@@ -29,5 +29,4 @@ int main()
     prj.installer().install_headers(Directory{rel_path("include")});
 
     generate_build(prj);
-    std::println("Generated build.ninja for project '{}'", prj.name());
 }

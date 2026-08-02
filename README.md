@@ -75,12 +75,12 @@ Tester &tester = project.tester();
 project.register_top_level_target(/*top level target*/)
 
 // Feature Detection
-bool compiles = project.try_compile(/* string meant to be compiled */, toLink);
-std::string runStdOut = project.try_run(/* string meant to be run */);
-bool headerExists = check_header("stdio");
-bool funcExists = check_function_exists("fork");
-bool symbolExists = check_symbol_exists("stat", {"sys/stath.h"});
-std::optional<size_t> typeSizeOpt = check_type_size("ptrdiff_t", {"stddef.h"});
+bool compilesAndLinks = project.try_compile(/* string meant to be compiled */, /*link=*/true);
+std::optional<std::string> runStdOut = project.try_run(/* string meant to be run */);
+bool headerExists = project.check_header("stdio");
+bool funcExists = project.check_function_exists("fork");
+bool symbolExists = project.check_symbol_exists("stat", {"sys/stat.h"});
+std::optional<size_t> typeSizeOpt = project.check_type_size("ptrdiff_t", {"stddef.h"});
 
 // helpers
 std::string_view buildDir = project.build_dir();
@@ -127,7 +127,22 @@ generate_build is the function to be called at the end of `int main() {}` and is
 
 ## Feature Detection
 
-**TODO**
+`Project` exposes feature detection helpers to configure the build.
+The checks respects the project's global properties (includes, compile flags, link flags) added via `add_global_property`, and is carried out in a scratch directory.
+
+```cpp
+bool compilesAndLink = project.try_compile(/* string meant to be compiled */, /*link=*/true);
+std::optional<std::string> runStdOut = project.try_run(/* string meant to be run */);
+
+bool headerExists = project.check_header("stdio");
+bool funcExists = project.check_function_exists("fork");
+bool symbolExists = project.check_symbol_exists("stat", {"sys/stat.h"});
+std::optional<size_t> typeSizeOpt = project.check_type_size("ptrdiff_t", {"stddef.h"});
+```
+
+- `try_compile` compiles a source snippet and optionally links it; `try_run` further executes it and returns the program's stdout.
+- `check_header` / `check_function_exists` / `check_symbol_exists` / `check_type_size` are conveniences built on top of the two primitives.
+- Results are typically forwarded to targets as compile flags, e.g. `app->add_property(private_, CompileFlagProperty{"-DHAVE_CSTDIO"})`.
 
 ## Utilities
 
@@ -141,11 +156,13 @@ Create a file `ze_build.cpp` with the `int main(int argc, char *argv[])` method 
 Compiling `ze_build.cpp`
 
 ```sh
-g++ ze_build.cpp /path/to/zimm/lib64/libzimmermann.a -I /path/to/zimm/include -o build/ze_build
+g++ -std=c++20 ze_build.cpp /path/to/zimm/lib64/libzimmermann.a -I /path/to/zimm/include -o build/ze_build
 ```
 
 On executing ze_build, the ninja build file is created in the build directory (defaults to cwd if not set in config).
 
 We recommend using per directory `ze_build.hpp` files which contains a factory function to build targets associated with that directory, this `ze_build.hpp` can be included into `ze_build.cpp`. 
 
-**NOTE**: targets have static lifetime the user doesn't need to burden themselves with managing lifetime of targets.
+**NOTE**: targets have static lifetime, the user doesn't need to burden themselves with managing lifetime of targets.
+
+Using the library requires atleast C++20, building and developed requires C++26
