@@ -22,7 +22,7 @@ int main()
     Project prj{"Custom Target Example", std::move(cfg)};
 
     // --- Custom target: run adder.py to generate adder.h + adder.cpp ---
-    auto gen = make_custom_target<AdderGen>("adder");
+    auto gen = make_custom_target<AdderGen>("adder", Directory{std::string{prj.build_dir()}});
     gen->add_input(rel_path("adder.py"));
     gen->add_output(gen->dir().make("adder.h"));
     gen->add_output(gen->dir().make("adder.cpp"));

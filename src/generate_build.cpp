@@ -1,7 +1,8 @@
-#include "../includes/zimm/project.hpp"
-#include "../includes/zimm/properties.hpp"
-#include "../includes/zimm/target.hpp"
 #include "gen_cc.hpp"
+#include "zimm/project.hpp"
+#include "zimm/properties.hpp"
+#include "zimm/target.hpp"
+#include "zimm/third_party_target.hpp"
 #include <fstream>
 #include <queue>
 
@@ -15,10 +16,7 @@ namespace
 {
 std::string_view get_assumed_path(const Target &target)
 {
-    for (auto &pobj : target.private_properties())
-        if (pobj->type() == PropertyType::AssumedProperty)
-            return static_cast<const AssumedProperty &>(*pobj).path();
-    return "";
+    return static_cast<const detail::AssumedTrait &>(target).assumed_path();
 };
 
 std::string ninja_target_name(const Target &target)
@@ -151,9 +149,8 @@ void generate_build(Project &project)
         std::string metaStamp = std::format("{}.meta.stamp", t->name());
         if (fs::exists(metaStamp)) continue;
 
-        fs::create_directories(fs::path{tpt.build_dir()});
-        std::string cmd =
-            std::format("cd {} && {} && touch {}", tpt.build_dir(), metaCmd, metaStamp);
+        fs::create_directories(fs::path{tpt.dir()});
+        std::string cmd = std::format("cd {} && {} && touch {}", tpt.dir(), metaCmd, metaStamp);
         if (std::system(cmd.c_str()) != 0)
             LOGF("Warning: meta-build step for '" << tpt.name() << "' failed");
     }
@@ -235,7 +232,7 @@ void generate_build(Project &project)
 
         std::string sourceObjectsNinjaNames;
         bool depsEnsured = false;
-        if (auto sourcesPtr = dynamic_cast<const detail::Sources *>(targetPtr))
+        if (auto sourcesPtr = dynamic_cast<const detail::SourcesTrait *>(targetPtr))
         {
             std::vector<std::string> objectNinjaNames;
             for (std::string_view src : sourcesPtr->sources())
@@ -305,12 +302,11 @@ void generate_build(Project &project)
             out << "build " << ninja_target_name(tpt) << ": run_cmd | " << depList << "\n";
 
             // Directory already created before executing meta command
-            out << "  dir = " << tpt.build_dir() << "\n";
+            out << "  dir = " << tpt.dir() << "\n";
             out << "  cmd = " << build << "\n";
             out << "  desc = BUILD " << tpt.name() << "\n\n";
 
-            genCc.add_entry(fs::absolute(tpt.build_dir()), ninja_target_name(tpt),
-                            std::string{build});
+            genCc.add_entry(fs::absolute(tpt.dir()), ninja_target_name(tpt), std::string{build});
             break;
         }
         case TargetType::CustomTarget:

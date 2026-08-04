@@ -21,7 +21,6 @@ enum class PropertyType
     CompileFlag,
     LinkFlag,
     LinkTarget,
-    AssumedProperty
 };
 
 class Property
@@ -78,12 +77,12 @@ public:
 
 namespace detail
 {
-class Sources;
+class SourcesTrait;
 }
 
 class LinkTargetProperty : public Property
 {
-    friend detail::Sources;
+    friend detail::SourcesTrait;
     const class Library *m_linkLib;
     explicit LinkTargetProperty(const Library *target);
 
@@ -93,25 +92,6 @@ public:
     {
         return std::make_unique<LinkTargetProperty>(*this);
     }
-};
-
-class AssumedProperty : public Property
-{
-    friend class ThirdPartyTarget;
-    std::string m_assumedPath;
-
-    explicit AssumedProperty(std::string assumedPath)
-        : Property(PropertyType::AssumedProperty), m_assumedPath(std::move(assumedPath))
-    {
-    }
-
-public:
-    std::unique_ptr<Property> clone() const override
-    {
-        return std::make_unique<AssumedProperty>(*this);
-    }
-
-    const std::string_view path() const noexcept { return m_assumedPath; }
 };
 
 } // namespace zimm
