@@ -56,7 +56,7 @@ EXAMPLES = [
         ],
     },
     {
-        "name": "third_party_target",
+        "name": "custom_target",
         "binary": "bin/a",
         "expected": ["43"],
         "install": [
