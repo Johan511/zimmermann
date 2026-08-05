@@ -30,6 +30,7 @@ struct ArgsParser
             std::string_view arg(m_args.argv[m_pos]);
             if (auto eq = arg.find('='); eq != std::string_view::npos)
                 m_current = {arg.substr(0, eq), arg.substr(eq + 1)};
+            // TODO: fix `throw;` with something more meaningful like `throw std::invalid_argument(...)`
             else throw;
         }
 

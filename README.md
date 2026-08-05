@@ -163,22 +163,27 @@ Taking note of the fact that manually figuring out the `metaBuildCmd`, `buildCmd
 ```cpp
 template <typename Strategy>
 concept ThirdPartyTargetStrategy = requires(const Strategy &s) {
+    // Strong failure safety -> is it fails and returns nullptr, there are no visible changes
     { s.attempt(std::string_view{} /* name */) } -> std::same_as<LeakyPtr<class ThirdPartyTarget>>;
 };
-
-template <TptMakeStrategy... Strategy>
-static auto ThirdPartyTarget::make(const Strategy &...tptMakeStrategies, std::string name,
-                                   std::optional<Directory> dir = {},
-                                   MetaBuildCmd metaBuildCmd = {}, BuildCmd buildCmd = {});
 ```
 
-The `ThirdPartyTarget::make` takes a variable number of `tptMakeStrategies` which attempt to make TPT,
-- First strategy to sucesfully make TPT returns the ThirdPartyTarget.
-  - If none of them are able to succefully make TPT then
-    - dir contains a value -> TPT is made using `(dir, metaBuildCmd, buildCmd)` args
-    - dir does not contain value (`std::nullopt`) -> return `nullptr`
+`ThirdPartyTarget::make` has two overloads:
 
-We provide the following TptMakeStrategies based on popular package management strategies
+**1. Strategy-based overload** — tries each strategy in order, returns the TPT from the first one that succeeds:
+```cpp
+template <ThirdPartyTargetStrategy... Strategies>
+static LeakyPtr<ThirdPartyTarget> make(std::string name, const Strategies &...strategies);
+```
+If no strategy succeeds, logs a message and returns `nullptr`.
+
+**2. Direct-construction overload** — creates a TPT with explicit parameters:
+```cpp
+static LeakyPtr<ThirdPartyTarget> make(std::string name, Directory dir,
+                                       MetaBuildCmd metaBuildCmd = {}, BuildCmd buildCmd = {});
+```
+
+We provide the following strategies based on popular package management approaches
 
 ### FindPackageTptStrat
 
@@ -215,17 +220,17 @@ FetchContentTptStrategy{build_dir("googletest"), fetchContentCmd, MetaBuildCmd{"
 FetchContentTptStrategy{build_dir(), "wget https://archives.boost.io/release/1.91.0/source/boost_1_91_0.tar.gz", tarUnpackCmd, BuildCmd{""}}
 ```
 
-The final `metaBuildCmd` of the `ThirdPartyTarget` is set as `{fetchContentCmd} && {metaBuildCmd}`.
+The final `metaBuildCmd` of the `ThirdPartyTarget` is set as `{fetchContentCmd} && {metaBuildCmd}`. The fetch command is **deferred** to meta-build time (not run eagerly), so `FetchContentTptStrategy::attempt` always returns a TPT. This is done so `attempt` can assure strong failure safety.
 
-If you don't want to manuall write the fetchContentCmd, zimmermann provides the following utilities for that
-- `git_fetch(std::string_view url, std::string_view id)`. Example:
+If you don't want to manually write the fetchContentCmd, zimmermann provides the following utilities for that
+- `git_fetch(const Directory &dir, std::string_view url, std::string_view id)`. Example:
   ```cpp
-  fetchContentCmd = git_fetch("git@github.com:nlohmann/json.git", "ad94fb0" /* sha-hash */)
-  fetchContentCmd = git_fetch("git@github.com:nlohmann/json.git", "master" /* branch name */)
-  fetchContentCmd = git_fetch("git@github.com:nlohmann/json.git", "v3.12.0" /* tag */)
+  fetchContentCmd = git_fetch(build_dir("json"), "git@github.com:nlohmann/json.git", "ad94fb0" /* sha-hash */)
+  fetchContentCmd = git_fetch(build_dir("json"), "git@github.com:nlohmann/json.git", "master" /* branch name */)
+  fetchContentCmd = git_fetch(build_dir("json"), "git@github.com:nlohmann/json.git", "v3.12.0" /* tag */)
 
   // explicitly state that this is a tag, and not to be confused with a branch
-  fetchContentCmd = git_fetch("git@github.com:nlohmann/json.git", "tag v3.12.0" /* tag */)
+  fetchContentCmd = git_fetch(build_dir("json"), "git@github.com:nlohmann/json.git", "tag v3.12.0" /* tag */)
   ```
 
 ## Recommended usage instructions

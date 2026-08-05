@@ -1,5 +1,4 @@
 #include "zimm/third_party_target.hpp"
-#include <iomanip>
 
 namespace zimm
 {
@@ -21,21 +20,29 @@ LeakyPtr<class ThirdPartyTarget> FindPackageTptStrategy::attempt(std::string_vie
 {
     namespace fs = std::filesystem;
 
-    for (fs::path path : m_searchPaths)
+    for (std::string_view pathStr : m_searchPaths)
     {
-        if (!fs::exists(path) || !fs::is_directory(path)) continue;
+        // ensure there is no trailing slash because path{"/foo/bar/"}.filename() == ""
+        if (pathStr.back() == '/') pathStr.remove_suffix(1);
 
-        fs::path folderName =
-            path.filename().empty() ? path.parent_path().filename() : path.filename();
-        if (folderName == name)
+        fs::path path{pathStr};
+        if (!fs::is_directory(path)) continue;
+
+        if (path.has_filename() /* handling the retarded case where path is "/" */
+            && path.filename().c_str() == name)
             return ThirdPartyTarget::make(std::string{name}, Directory{std::string{path}});
 
-        for (const auto &child : fs::directory_iterator(path))
+        using fs::directory_options::skip_permission_denied;
+        // TODO: do we need follow_directory_symlink?
+        // TODO: do we need to try-catch the iteration increment?
+        for (const auto &child : fs::directory_iterator(path, skip_permission_denied))
         {
             if (!child.is_directory()) continue;
-
             const fs::path &childPath = child.path();
-            if (childPath.filename() != name) continue;
+
+            /* no need special folder name handling as directory_iterator
+             * always returns path without trailing slashes */
+            if (childPath.filename().c_str() != name) continue;
             return ThirdPartyTarget::make(std::string{name}, Directory{childPath.string()});
         }
     }
@@ -54,14 +61,10 @@ LeakyPtr<class ThirdPartyTarget> FetchContentTptStrategy::attempt(std::string_vi
     namespace fs = std::filesystem;
 
     fs::create_directories(m_dir.path());
-    std::string fetchCmd = std::format("cd {} && {}", m_dir.path(), m_fetchContentCmd);
-    if (std::system(fetchCmd.c_str()))
-    {
-        LOGD("FetchContent cmd " << std::quoted(fetchCmd) << " failed");
-        return nullptr;
-    }
-
-    return ThirdPartyTarget::make(std::string{name}, m_dir, m_metaBuildCmd, m_buildCmd);
+    MetaBuildCmd fetchAndMetaBuild = MetaBuildCmd{std::format(
+        "cd {} && {} && {}", m_dir.path(), m_fetchContentCmd, m_metaBuildCmd.metaBuildCmd)};
+    return ThirdPartyTarget::make(std::string{name}, m_dir, std::move(fetchAndMetaBuild),
+                                  m_buildCmd);
 }
 
 ThirdPartyTarget::ThirdPartyTarget(std::string name, Directory dir, MetaBuildCmd metaBuildCmd,
@@ -71,47 +74,30 @@ ThirdPartyTarget::ThirdPartyTarget(std::string name, Directory dir, MetaBuildCmd
 {
 }
 
-template <ThirdPartyTargetStrategy... Strategies>
-LeakyPtr<ThirdPartyTarget> ThirdPartyTarget::make(const Strategies &...strategies, std::string name,
-                                                  std::optional<Directory> dir,
-                                                  MetaBuildCmd metaBuildCmd, BuildCmd buildCmd)
-{
-    LeakyPtr<ThirdPartyTarget> result{};
-    if (!(... || (result = strategies.attempt(name), result)))
-    {
-        if (dir)
-            return LeakyPtr<ThirdPartyTarget>(
-                new ThirdPartyTarget{std::move(name), std::move(dir).value(),
-                                     std::move(metaBuildCmd), std::move(buildCmd)});
-        LOGE("Failed to make third party target");
-    }
-    return result;
-}
-
 LeakyPtr<Executable> ThirdPartyTarget::assume_executable(std::string name,
-                                                         std::string pathRelToThirdPartyBuildDir)
+                                                         std::string pathRelToTptDir)
 {
     auto target = make_executable(std::move(name));
     add_dependency_rel(target.get(), this);
-    target.get()->m_assumedPath = m_dir.make(pathRelToThirdPartyBuildDir);
+    target.get()->m_assumedPath = m_dir.make(pathRelToTptDir);
     return target;
 }
 
-LeakyPtr<StaticLibrary>
-ThirdPartyTarget::assume_static_library(std::string name, std::string pathRelToThirdPartyBuildDir)
+LeakyPtr<StaticLibrary> ThirdPartyTarget::assume_static_library(std::string name,
+                                                                std::string pathRelToTptDir)
 {
     auto target = make_static_library(std::move(name));
     add_dependency_rel(target.get(), this);
-    target.get()->m_assumedPath = m_dir.make(pathRelToThirdPartyBuildDir);
+    target.get()->m_assumedPath = m_dir.make(pathRelToTptDir);
     return target;
 }
 
-LeakyPtr<SharedLibrary>
-ThirdPartyTarget::assume_shared_library(std::string name, std::string pathRelToThirdPartyBuildDir)
+LeakyPtr<SharedLibrary> ThirdPartyTarget::assume_shared_library(std::string name,
+                                                                std::string pathRelToTptDir)
 {
     auto target = make_shared_library(std::move(name));
     add_dependency_rel(target.get(), this);
-    target.get()->m_assumedPath = m_dir.make(pathRelToThirdPartyBuildDir);
+    target.get()->m_assumedPath = m_dir.make(pathRelToTptDir);
     return target;
 }
 

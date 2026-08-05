@@ -146,7 +146,7 @@ void generate_build(Project &project)
         auto metaCmd = tpt.meta_build_cmd();
         if (metaCmd.empty()) continue;
 
-        std::string metaStamp = std::format("{}.meta.stamp", t->name());
+        std::string metaStamp = std::format("{}/{}.meta.stamp", tpt.dir(), t->name());
         if (fs::exists(metaStamp)) continue;
 
         fs::create_directories(fs::path{tpt.dir()});
@@ -322,7 +322,7 @@ void generate_build(Project &project)
             out << " | " << depList << "\n";
 
             // Third Party Target is not expected to have sources
-            if (depsEnsured) LOGF("Why does Third Party Target have sources?");
+            if (depsEnsured) LOGF("Why does CustomTarget have sources?");
 
             auto genCmd = ct.generate_cmd();
             out << "  dir = " << ct.dir().path() << "\n";
