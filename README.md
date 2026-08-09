@@ -163,7 +163,7 @@ Taking note of the fact that manually figuring out the `metaBuildCmd`, `buildCmd
 ```cpp
 template <typename Strategy>
 concept ThirdPartyTargetStrategy = requires(const Strategy &s) {
-    // Strong failure safety -> is it fails and returns nullptr, there are no visible changes
+    // Strong failure safety -> if it fails and returns nullptr, there are no visible changes
     { s.attempt(std::string_view{} /* name */) } -> std::same_as<LeakyPtr<class ThirdPartyTarget>>;
 };
 ```

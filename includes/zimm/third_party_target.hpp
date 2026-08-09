@@ -9,16 +9,16 @@ namespace zimm
 
 struct BuildCmd
 {
-    std::string buildCmd;
-    explicit BuildCmd(std::string cmd) : buildCmd(std::move(cmd)) {};
-    BuildCmd() : buildCmd("") {};
+    std::string cmd;
+    explicit BuildCmd(std::string cmd) : cmd(std::move(cmd)) {};
+    BuildCmd() : cmd("") {};
 };
 
 struct MetaBuildCmd
 {
-    std::string metaBuildCmd;
-    explicit MetaBuildCmd(std::string cmd) : metaBuildCmd(std::move(cmd)) {};
-    MetaBuildCmd() : metaBuildCmd("") {};
+    std::string cmd;
+    explicit MetaBuildCmd(std::string cmd) : cmd(std::move(cmd)) {};
+    MetaBuildCmd() : cmd("") {};
 };
 
 template <typename Strategy>
@@ -53,12 +53,9 @@ public:
             std::move(name), std::move(dir), std::move(metaBuildCmd), std::move(buildCmd)});
     }
 
-    LeakyPtr<Executable> assume_executable(std::string name,
-                                           std::string pathRelToThirdPartyBuildDir);
-    LeakyPtr<StaticLibrary> assume_static_library(std::string name,
-                                                  std::string pathRelToThirdPartyBuildDir);
-    LeakyPtr<SharedLibrary> assume_shared_library(std::string name,
-                                                  std::string pathRelToThirdPartyBuildDir);
+    LeakyPtr<Executable> assume_executable(std::string name, std::string pathRelToTptDir);
+    LeakyPtr<StaticLibrary> assume_static_library(std::string name, std::string pathRelToTptDir);
+    LeakyPtr<SharedLibrary> assume_shared_library(std::string name, std::string pathRelToTptDir);
 
     std::string_view meta_build_cmd() const noexcept { return m_metaBuildCmd; }
     std::string_view build_cmd() const noexcept { return m_buildCmd; }

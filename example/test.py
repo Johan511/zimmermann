@@ -80,6 +80,15 @@ EXAMPLES = [
             "bin/zimm_dir",
         ],
     },
+    {
+        "name": "third_party_target",
+        "binary": "bin/tpt_demo",
+        "expected": ["tpt_demo ok"],
+        "install": [
+            "bin/tpt_demo",
+        ],
+        "net": True,
+    },
 ]
 
 
@@ -278,6 +287,8 @@ def main() -> int:
             if not examples:
                 print(f"error: no matching examples for --ex {sys.argv[idx + 1]!r}", file=sys.stderr)
                 return 1
+    if "--no-net" in sys.argv:
+        examples = [ex for ex in examples if not ex.get("net")]
 
     perf = "--perf" in sys.argv
 

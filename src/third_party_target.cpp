@@ -22,6 +22,8 @@ LeakyPtr<class ThirdPartyTarget> FindPackageTptStrategy::attempt(std::string_vie
 
     for (std::string_view pathStr : m_searchPaths)
     {
+        if (pathStr.empty()) continue;
+
         // ensure there is no trailing slash because path{"/foo/bar/"}.filename() == ""
         if (pathStr.back() == '/') pathStr.remove_suffix(1);
 
@@ -61,8 +63,10 @@ LeakyPtr<class ThirdPartyTarget> FetchContentTptStrategy::attempt(std::string_vi
     namespace fs = std::filesystem;
 
     fs::create_directories(m_dir.path());
+    std::string fetchContentCmd = m_fetchContentCmd.empty() ? "true" : m_fetchContentCmd;
+    std::string metaBuildCmd = m_metaBuildCmd.cmd.empty() ? "true" : m_metaBuildCmd.cmd;
     MetaBuildCmd fetchAndMetaBuild = MetaBuildCmd{std::format(
-        "cd {} && {} && {}", m_dir.path(), m_fetchContentCmd, m_metaBuildCmd.metaBuildCmd)};
+        "cd {} && {} && {}", m_dir.path(), std::move(fetchContentCmd), std::move(metaBuildCmd))};
     return ThirdPartyTarget::make(std::string{name}, m_dir, std::move(fetchAndMetaBuild),
                                   m_buildCmd);
 }
@@ -70,7 +74,7 @@ LeakyPtr<class ThirdPartyTarget> FetchContentTptStrategy::attempt(std::string_vi
 ThirdPartyTarget::ThirdPartyTarget(std::string name, Directory dir, MetaBuildCmd metaBuildCmd,
                                    BuildCmd buildCmd)
     : Target(TargetType::ThirdPartyTarget, std::move(name)), m_dir(std::move(dir)),
-      m_metaBuildCmd(std::move(metaBuildCmd.metaBuildCmd)), m_buildCmd(std::move(buildCmd.buildCmd))
+      m_metaBuildCmd(std::move(metaBuildCmd.cmd)), m_buildCmd(std::move(buildCmd.cmd))
 {
 }
 

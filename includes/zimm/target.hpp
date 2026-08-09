@@ -102,6 +102,15 @@ public:
     {
         add_property_impl(m_privateProperties, property);
     }
+
+    void add_public_property(PropertyObject property)
+    {
+        add_property_impl(m_publicProperties, std::move(property));
+    }
+    void add_private_property(PropertyObject property)
+    {
+        add_property_impl(m_privateProperties, std::move(property));
+    }
 };
 
 class Library : public Target, public detail::SourcesTrait

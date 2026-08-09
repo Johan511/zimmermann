@@ -21,6 +21,9 @@ std::string_view get_assumed_path(const Target &target)
 
 std::string ninja_target_name(const Target &target)
 {
+    std::string assumedPath = std::string{get_assumed_path(target)};
+    if (!assumedPath.empty()) return assumedPath;
+
     switch (target.type())
     {
     case TargetType::Executable:
@@ -136,7 +139,7 @@ void generate_build(Project &project)
     {
         Target &t = *tRef;
         for (auto dep : t.dependencies())
-            for (auto p : dep->public_properties()) t.add_property(public_, p);
+            for (auto &p : dep->public_properties()) t.add_property(public_, p);
     }
 
     for (auto t : topSortedTargets)
@@ -146,11 +149,11 @@ void generate_build(Project &project)
         auto metaCmd = tpt.meta_build_cmd();
         if (metaCmd.empty()) continue;
 
-        std::string metaStamp = std::format("{}/{}.meta.stamp", tpt.dir(), t->name());
+        std::string metaStamp = std::format("{}{}.meta.stamp", project.build_dir(), t->name());
         if (fs::exists(metaStamp)) continue;
 
         fs::create_directories(fs::path{tpt.dir()});
-        std::string cmd = std::format("cd {} && {} && touch {}", tpt.dir(), metaCmd, metaStamp);
+        std::string cmd = std::format("(cd {} && {}) && touch {}", tpt.dir(), metaCmd, metaStamp);
         if (std::system(cmd.c_str()) != 0)
             LOGF("Warning: meta-build step for '" << tpt.name() << "' failed");
     }
@@ -215,20 +218,22 @@ void generate_build(Project &project)
         const Target &target = *targetPtr;
         auto assumedPath = get_assumed_path(target);
         auto depList = get_deps_list(target);
-        auto ninjaName = ninja_target_name(target);
 
+        // is an assumed target
+        if (!assumedPath.empty())
+        {
+            out << "build " << assumedPath << ": assumed_target";
+            if (!depList.empty()) out << " | " << depList;
+            out << "\n\n";
+            continue;
+        }
+
+        auto ninjaName = ninja_target_name(target);
         std::string localCompileFlags = get_compile_flags(target.public_properties()) + " " +
                                         get_compile_flags(target.private_properties());
 
         std::string localLinkFlags = get_link_flags(target.public_properties()) + " " +
                                      get_link_flags(target.private_properties());
-
-        // is an assumed target
-        if (!assumedPath.empty())
-        {
-            out << "build " << assumedPath << ": assumed_target\n\n";
-            continue;
-        }
 
         std::string sourceObjectsNinjaNames;
         bool depsEnsured = false;
