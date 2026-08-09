@@ -32,9 +32,6 @@ void Target::add_property_impl(std::vector<PropertyObject> &properties, Property
         case PropertyType::LinkTarget:
             return static_cast<const LinkTargetProperty &>(a).link_lib() ==
                    static_cast<const LinkTargetProperty &>(b).link_lib();
-        case PropertyType::AssumedProperty:
-            return static_cast<const AssumedProperty &>(a).path() ==
-                   static_cast<const AssumedProperty &>(b).path();
         }
         return false;
     };
@@ -68,14 +65,14 @@ std::string to_string(const TargetType &type)
     std::unreachable();
 }
 
-void detail::Sources::link_with(const PublicTag *, Library *linkLib)
+void detail::SourcesTrait::link_with(const PublicTag *, Library *linkLib)
 {
     Target *thisTarget = dynamic_cast<Target *>(this);
     add_dependency_rel(thisTarget, linkLib);
     thisTarget->add_property(public_, LinkTargetProperty{linkLib});
 }
 
-void detail::Sources::link_with(const PrivateTag *, Library *linkLib)
+void detail::SourcesTrait::link_with(const PrivateTag *, Library *linkLib)
 {
     Target *thisTarget = dynamic_cast<Target *>(this);
     add_dependency_rel(thisTarget, linkLib);

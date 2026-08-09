@@ -21,7 +21,6 @@ enum class PropertyType
     CompileFlag,
     LinkFlag,
     LinkTarget,
-    AssumedProperty
 };
 
 class Property
@@ -42,7 +41,7 @@ class IncludeProperty : public Property
     std::string m_includePath;
 
 public:
-    explicit IncludeProperty(std::string includePath);
+    explicit IncludeProperty(std::string_view includePath);
     std::string_view include_path() const noexcept { return m_includePath; }
     std::unique_ptr<Property> clone() const override
     {
@@ -55,7 +54,7 @@ class CompileFlagProperty : public Property
     std::string m_flags;
 
 public:
-    explicit CompileFlagProperty(std::string flag);
+    explicit CompileFlagProperty(std::string_view flag);
     std::string_view flag() const noexcept { return m_flags; }
     std::unique_ptr<Property> clone() const override
     {
@@ -68,7 +67,7 @@ class LinkFlagProperty : public Property
     std::string m_flags;
 
 public:
-    explicit LinkFlagProperty(std::string flag);
+    explicit LinkFlagProperty(std::string_view flag);
     std::string_view flag() const noexcept { return m_flags; }
     std::unique_ptr<Property> clone() const override
     {
@@ -78,12 +77,12 @@ public:
 
 namespace detail
 {
-class Sources;
+class SourcesTrait;
 }
 
 class LinkTargetProperty : public Property
 {
-    friend detail::Sources;
+    friend detail::SourcesTrait;
     const class Library *m_linkLib;
     explicit LinkTargetProperty(const Library *target);
 
@@ -93,25 +92,6 @@ public:
     {
         return std::make_unique<LinkTargetProperty>(*this);
     }
-};
-
-class AssumedProperty : public Property
-{
-    friend class ThirdPartyTarget;
-    std::string m_assumedPath;
-
-    explicit AssumedProperty(std::string assumedPath)
-        : Property(PropertyType::AssumedProperty), m_assumedPath(std::move(assumedPath))
-    {
-    }
-
-public:
-    std::unique_ptr<Property> clone() const override
-    {
-        return std::make_unique<AssumedProperty>(*this);
-    }
-
-    const std::string_view path() const noexcept { return m_assumedPath; }
 };
 
 } // namespace zimm

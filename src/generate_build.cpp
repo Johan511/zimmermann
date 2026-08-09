@@ -1,7 +1,8 @@
-#include "../includes/zimm/project.hpp"
-#include "../includes/zimm/properties.hpp"
-#include "../includes/zimm/target.hpp"
 #include "gen_cc.hpp"
+#include "zimm/project.hpp"
+#include "zimm/properties.hpp"
+#include "zimm/target.hpp"
+#include "zimm/third_party_target.hpp"
 #include <fstream>
 #include <queue>
 
@@ -15,14 +16,14 @@ namespace
 {
 std::string_view get_assumed_path(const Target &target)
 {
-    for (auto &pobj : target.private_properties())
-        if (pobj->type() == PropertyType::AssumedProperty)
-            return static_cast<const AssumedProperty &>(*pobj).path();
-    return "";
+    return static_cast<const detail::AssumedTrait &>(target).assumed_path();
 };
 
 std::string ninja_target_name(const Target &target)
 {
+    std::string assumedPath = std::string{get_assumed_path(target)};
+    if (!assumedPath.empty()) return assumedPath;
+
     switch (target.type())
     {
     case TargetType::Executable:
@@ -138,7 +139,7 @@ void generate_build(Project &project)
     {
         Target &t = *tRef;
         for (auto dep : t.dependencies())
-            for (auto p : dep->public_properties()) t.add_property(public_, p);
+            for (auto &p : dep->public_properties()) t.add_property(public_, p);
     }
 
     for (auto t : topSortedTargets)
@@ -148,12 +149,11 @@ void generate_build(Project &project)
         auto metaCmd = tpt.meta_build_cmd();
         if (metaCmd.empty()) continue;
 
-        std::string metaStamp = std::format("{}.meta.stamp", t->name());
+        std::string metaStamp = std::format("{}{}.meta.stamp", project.build_dir(), t->name());
         if (fs::exists(metaStamp)) continue;
 
-        fs::create_directories(fs::path{tpt.build_dir()});
-        std::string cmd =
-            std::format("cd {} && {} && touch {}", tpt.build_dir(), metaCmd, metaStamp);
+        fs::create_directories(fs::path{tpt.dir()});
+        std::string cmd = std::format("(cd {} && {}) && touch {}", tpt.dir(), metaCmd, metaStamp);
         if (std::system(cmd.c_str()) != 0)
             LOGF("Warning: meta-build step for '" << tpt.name() << "' failed");
     }
@@ -218,24 +218,26 @@ void generate_build(Project &project)
         const Target &target = *targetPtr;
         auto assumedPath = get_assumed_path(target);
         auto depList = get_deps_list(target);
-        auto ninjaName = ninja_target_name(target);
 
+        // is an assumed target
+        if (!assumedPath.empty())
+        {
+            out << "build " << assumedPath << ": assumed_target";
+            if (!depList.empty()) out << " | " << depList;
+            out << "\n\n";
+            continue;
+        }
+
+        auto ninjaName = ninja_target_name(target);
         std::string localCompileFlags = get_compile_flags(target.public_properties()) + " " +
                                         get_compile_flags(target.private_properties());
 
         std::string localLinkFlags = get_link_flags(target.public_properties()) + " " +
                                      get_link_flags(target.private_properties());
 
-        // is an assumed target
-        if (!assumedPath.empty())
-        {
-            out << "build " << assumedPath << ": assumed_target\n\n";
-            continue;
-        }
-
         std::string sourceObjectsNinjaNames;
         bool depsEnsured = false;
-        if (auto sourcesPtr = dynamic_cast<const detail::Sources *>(targetPtr))
+        if (auto sourcesPtr = dynamic_cast<const detail::SourcesTrait *>(targetPtr))
         {
             std::vector<std::string> objectNinjaNames;
             for (std::string_view src : sourcesPtr->sources())
@@ -305,12 +307,11 @@ void generate_build(Project &project)
             out << "build " << ninja_target_name(tpt) << ": run_cmd | " << depList << "\n";
 
             // Directory already created before executing meta command
-            out << "  dir = " << tpt.build_dir() << "\n";
+            out << "  dir = " << tpt.dir() << "\n";
             out << "  cmd = " << build << "\n";
             out << "  desc = BUILD " << tpt.name() << "\n\n";
 
-            genCc.add_entry(fs::absolute(tpt.build_dir()), ninja_target_name(tpt),
-                            std::string{build});
+            genCc.add_entry(fs::absolute(tpt.dir()), ninja_target_name(tpt), std::string{build});
             break;
         }
         case TargetType::CustomTarget:
@@ -326,7 +327,7 @@ void generate_build(Project &project)
             out << " | " << depList << "\n";
 
             // Third Party Target is not expected to have sources
-            if (depsEnsured) LOGF("Why does Third Party Target have sources?");
+            if (depsEnsured) LOGF("Why does CustomTarget have sources?");
 
             auto genCmd = ct.generate_cmd();
             out << "  dir = " << ct.dir().path() << "\n";

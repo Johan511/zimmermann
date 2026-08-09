@@ -14,6 +14,7 @@ add_library(zimmermann STATIC
     src/config.cpp
     src/gen_cc.cpp
     src/generate_build.cpp
+    src/third_party_target.cpp
 )
 target_compile_definitions(zimmermann PRIVATE
     ZIMM_BUILDING_LIB

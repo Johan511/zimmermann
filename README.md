@@ -149,6 +149,90 @@ std::optional<size_t> typeSizeOpt = project.check_type_size("ptrdiff_t", {"stdde
 1. **`rel_path(std::string)`**: Generate a path relative to the directory containing the file
 2. **`zimm_dir()`**: Returns the directory where zimmermann has been installed (figures out from where the headers are found by the compiler)
 
+## Third Party Target
+C++ package management is an operational debacle, we try our best to keep it intuitive at the cost of making it a bit verbose.
+
+`ThirdPartyTarget` (TPT) is a concrete Target type which is defined by the tuple `(name, directory, metaBuildCmd, buildCmd)`.
+
+- `metaBuildCmd` is the cmd which runs only once during setup (ie when ze_build is executed), it is not run on every build invocation
+- `buildCmd` is the cmd which runs on every execution to build TPT if any of its dependencies are modified
+- `directory` is the directory in which `metaBuildCmd` and `buildCmd` are executed
+
+Taking note of the fact that manually figuring out the `metaBuildCmd`, `buildCmd`, `directory` could be too tiring we provide factories to generate them.
+
+```cpp
+template <typename Strategy>
+concept ThirdPartyTargetStrategy = requires(const Strategy &s) {
+    // Strong failure safety -> if it fails and returns nullptr, there are no visible changes
+    { s.attempt(std::string_view{} /* name */) } -> std::same_as<LeakyPtr<class ThirdPartyTarget>>;
+};
+```
+
+`ThirdPartyTarget::make` has two overloads:
+
+**1. Strategy-based overload** — tries each strategy in order, returns the TPT from the first one that succeeds:
+```cpp
+template <ThirdPartyTargetStrategy... Strategies>
+static LeakyPtr<ThirdPartyTarget> make(std::string name, const Strategies &...strategies);
+```
+If no strategy succeeds, logs a message and returns `nullptr`.
+
+**2. Direct-construction overload** — creates a TPT with explicit parameters:
+```cpp
+static LeakyPtr<ThirdPartyTarget> make(std::string name, Directory dir,
+                                       MetaBuildCmd metaBuildCmd = {}, BuildCmd buildCmd = {});
+```
+
+We provide the following strategies based on popular package management approaches
+
+### FindPackageTptStrat
+
+Attempts to find the installed package from among the paths provided in its ctor.
+
+```cpp
+FindPackageTptStrat(std::string searchPath);
+FindPackageTptStrat(std::vector<std::string> searchPaths);
+FindPackageTptStrat() : FindPackageTptStrat(/* default zimmermann search paths */);
+```
+
+`attempt(std::string_view tptName)` searches all the directories in the search path to find if they have a child directory named `tptName` or if they themselves are called `tptName`
+
+### FetchContentTptStrategy
+
+Attempts to fetch the library from the given url and build it using the given metaBuildCmd and buildCmd.
+
+```cpp
+FetchContentTptStrategy(Directory dir,
+                        std::string fetchContentCmd,
+                        MetaBuildCmd metaBuildCmd,
+                        BuildCmd buildCmd);
+```
+
+Example Usage:
+```cpp
+// cmake setup at ze_build execution, build library which building using generator
+FetchContentTptStrategy{build_dir("googletest"), fetchContentCmd, MetaBuildCmd{"cmake -S . -B build"}, BuildCmd{"cmake --build build"}}
+
+// cmake setup, package build and install - all during ze_build execution
+FetchContentTptStrategy{build_dir("googletest"), fetchContentCmd, MetaBuildCmd{"cmake -S . -B build && cmake --build build && cmake --install build"}}
+
+// fetch the package directly and unpack it
+FetchContentTptStrategy{build_dir(), "wget https://archives.boost.io/release/1.91.0/source/boost_1_91_0.tar.gz", tarUnpackCmd, BuildCmd{""}}
+```
+
+The final `metaBuildCmd` of the `ThirdPartyTarget` is set as `{fetchContentCmd} && {metaBuildCmd}`. The fetch command is **deferred** to meta-build time (not run eagerly), so `FetchContentTptStrategy::attempt` always returns a TPT. This is done so `attempt` can assure strong failure safety.
+
+If you don't want to manually write the fetchContentCmd, zimmermann provides the following utilities for that
+- `git_fetch(const Directory &dir, std::string_view url, std::string_view id)`. Example:
+  ```cpp
+  fetchContentCmd = git_fetch(build_dir("json"), "git@github.com:nlohmann/json.git", "ad94fb0" /* sha-hash */)
+  fetchContentCmd = git_fetch(build_dir("json"), "git@github.com:nlohmann/json.git", "master" /* branch name */)
+  fetchContentCmd = git_fetch(build_dir("json"), "git@github.com:nlohmann/json.git", "v3.12.0" /* tag */)
+
+  // explicitly state that this is a tag, and not to be confused with a branch
+  fetchContentCmd = git_fetch(build_dir("json"), "git@github.com:nlohmann/json.git", "tag v3.12.0" /* tag */)
+  ```
+
 ## Recommended usage instructions
 
 Create a file `ze_build.cpp` with the `int main(int argc, char *argv[])` method - this will be the .cpp file which will be compiled into the `ze_build` executable which generates the `ninja` build instructions.
@@ -161,7 +245,7 @@ g++ -std=c++20 ze_build.cpp /path/to/zimm/lib64/libzimmermann.a -I /path/to/zimm
 
 On executing ze_build, the ninja build file is created in the build directory (defaults to cwd if not set in config).
 
-We recommend using per directory `ze_build.hpp` files which contains a factory function to build targets associated with that directory, this `ze_build.hpp` can be included into `ze_build.cpp`. 
+We recommend using per directory `ze_build.hpp` files which contains a factory function to build targets associated with that directory, this `ze_build.hpp` can be included into `ze_build.cpp`.
 
 **NOTE**: targets have static lifetime, the user doesn't need to burden themselves with managing lifetime of targets.
 

@@ -6,18 +6,18 @@ namespace zimm
 
 Property::Property(PropertyType type) : m_type(type) {}
 
-IncludeProperty::IncludeProperty(std::string includePath)
-    : Property(PropertyType::Include), m_includePath(std::move(includePath))
+IncludeProperty::IncludeProperty(std::string_view includePath)
+    : Property(PropertyType::Include), m_includePath(std::string{includePath})
 {
 }
 
-CompileFlagProperty::CompileFlagProperty(std::string flag)
-    : Property(PropertyType::CompileFlag), m_flags(std::move(flag))
+CompileFlagProperty::CompileFlagProperty(std::string_view flag)
+    : Property(PropertyType::CompileFlag), m_flags(std::string{flag})
 {
 }
 
-LinkFlagProperty::LinkFlagProperty(std::string flag)
-    : Property(PropertyType::LinkFlag), m_flags(std::move(flag))
+LinkFlagProperty::LinkFlagProperty(std::string_view flag)
+    : Property(PropertyType::LinkFlag), m_flags(std::string{flag})
 {
 }
 

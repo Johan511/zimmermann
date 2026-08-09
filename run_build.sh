@@ -5,6 +5,11 @@ PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build"
 INSTALL_DIR="$PROJECT_ROOT/install"
 
+if [ -d "$INSTALL_DIR" ]; then
+    chmod -R a+w "$INSTALL_DIR"
+    rm -rf "$INSTALL_DIR"
+fi
+
 # --- Clean (optional: pass --clean) ---
 if [[ "${1:-}" == "--clean" ]]; then
     echo "==> Cleaning build and install directories..."
@@ -21,9 +26,6 @@ cmake -S "$PROJECT_ROOT" \
 # --- Build ---
 echo "==> Building..."
 cmake --build "$BUILD_DIR" --parallel "$(nproc)"
-
-chmod -R a+w "$INSTALL_DIR"
-rm -rf "$INSTALL_DIR"
 
 # --- Install ---
 echo "==> Installing to $INSTALL_DIR..."
