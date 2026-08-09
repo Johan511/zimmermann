@@ -10,7 +10,6 @@ using namespace zimm;
 int main()
 {
     auto cfg = Config{};
-    cfg.install_dir = rel_path("install");
     Project prj{"Complex Example", std::move(cfg)};
 
     auto libcore = define_libcore();

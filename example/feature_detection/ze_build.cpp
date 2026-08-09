@@ -5,7 +5,6 @@ using namespace zimm;
 int main()
 {
     auto cfg = Config{};
-    cfg.install_dir = rel_path("install");
     Project prj{"Feature Detection", std::move(cfg)};
 
     auto app = make_executable("feature_detect");

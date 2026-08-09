@@ -5,7 +5,6 @@ using namespace zimm;
 int main()
 {
     auto cfg = Config{};
-    cfg.install_dir = rel_path("install");
     Project prj{"Hello World", std::move(cfg)};
     prj.add_global_property(CompileFlagProperty{"-std=c++23"});
 

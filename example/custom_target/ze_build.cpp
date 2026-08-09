@@ -18,7 +18,6 @@ struct AdderGen
 int main()
 {
     auto cfg = Config{};
-    cfg.install_dir = rel_path("install");
     Project prj{"Custom Target Example", std::move(cfg)};
 
     // --- Custom target: run adder.py to generate adder.h + adder.cpp ---
