@@ -4,6 +4,7 @@ import subprocess
 import sys
 import shutil
 import time
+import pathlib
 
 EXAMPLES_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -129,7 +130,7 @@ def run_zimm(test_build_dir: str) -> int | None:
         return False
     log_path = os.path.join(test_build_dir, "zimm.log")
     with open(log_path, "w") as log:
-        result = subprocess.run([ze_bin], stdout=log, stderr=subprocess.STDOUT, cwd=test_build_dir)
+        result = subprocess.run([ze_bin], stdout=log, stderr=log, cwd=test_build_dir)
     return True if result.returncode == 0 else False 
 
 
@@ -139,7 +140,7 @@ def run_ninja(build_dir: str) -> bool:
         result = subprocess.run(
             ["ninja", "-C", build_dir],
             stdout=log,
-            stderr=subprocess.STDOUT,
+            stderr=log,
         )
     if result.returncode != 0:
         print(f"ninja failed with exit code {result.returncode}", file=sys.stderr)
@@ -189,7 +190,7 @@ def run_ninja_install(build_dir: str) -> bool:
         result = subprocess.run(
             ["ninja", "-C", build_dir, "install"],
             stdout=log,
-            stderr=subprocess.STDOUT,
+            stderr=log,
         )
     if result.returncode != 0:
         print(f"ninja install failed with exit code {result.returncode}", file=sys.stderr)
@@ -205,6 +206,26 @@ def check_output(stdout: str, expected: list[str]) -> bool:
             print(stdout, file=sys.stderr)
             return False
         rest = rest[idx + len(line):]
+    return True
+
+def check_clangd(example_dir, build_dir) -> bool:
+    log_path = os.path.join(build_dir, "clangd.log")
+
+    with open(log_path, "w") as log:
+        for cpp_file in pathlib.Path(example_dir).rglob('*.cpp'):
+            # ignore files within build dir
+            # for third_party_target where external libraries are cloned into build dir
+            if cpp_file.is_relative_to(build_dir):
+                continue
+
+            log.write(f"\n### {cpp_file} ###\n")
+            log.flush()
+            result = subprocess.run(['clangd', f'--check={cpp_file}'],
+                                    stdout=log,
+                                    stderr=log
+                                    )
+            if result.returncode != 0:
+                return False
     return True
 
 def test_example(example: dict, perf: bool = False) -> bool:
@@ -259,6 +280,10 @@ def test_example(example: dict, perf: bool = False) -> bool:
         if not run_test(build_dir, example["tests"]):
             print(f"FAIL  {name}: ninja test failed")
             return False
+
+    if not check_clangd(test_dir, build_dir):
+        print(f"FAIL {name}: clangd check failed")
+        return False
 
     msg = f"PASS  {name}"
     if perf:

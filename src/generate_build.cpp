@@ -212,7 +212,7 @@ void generate_build(Project &project)
     std::string zeBuildCppDir = std::filesystem::path{zeBuildCpp}.parent_path().string();
 
     std::string zimmIncludePath = (std::filesystem::path{zimm_dir()} / "include").string();
-    std::string compileCmdGuess = std::format("g++ -I{} ze_build.cpp -std=c++23", zimmIncludePath);
+    std::string compileCmdGuess = std::format("g++ -I{} ze_build.cpp -std=c++20", zimmIncludePath);
 
     genCc.add_entry(std::move(zeBuildCppDir), std::string{zeBuildCpp}, std::move(compileCmdGuess));
 
@@ -259,9 +259,8 @@ void generate_build(Project &project)
                 out << "  flags = " << flags << "\n\n";
 
                 genCc.add_entry(std::string{project.build_dir()}, std::string{src},
-                                std::format("{} -MD -MT {} -MF {}.d -c {} -o {} {}",
-                                            isCxx ? gxx : gcc, objectNinjaName, objectNinjaName,
-                                            src, objectNinjaName, flags));
+                                std::format("{} -c {} -o {} {}", isCxx ? gxx : gcc, src,
+                                            objectNinjaName, flags));
             }
         }
 
@@ -314,7 +313,6 @@ void generate_build(Project &project)
             out << "  cmd = " << build << "\n";
             out << "  desc = BUILD " << tpt.name() << "\n\n";
 
-            genCc.add_entry(fs::absolute(tpt.dir()), ninja_target_name(tpt), std::string{build});
             break;
         }
         case TargetType::CustomTarget:
@@ -337,10 +335,6 @@ void generate_build(Project &project)
             out << "  cmd = " << genCmd << "\n";
             out << "  desc = CUSTOM " << target.name() << "\n\n";
 
-            genCc.add_entry(fs::absolute(ct.dir().path()),
-                            ct.outputs().empty() ? ninja_target_name(target)
-                                                 : std::string{ct.outputs().front()},
-                            std::move(genCmd));
             break;
         }
         }

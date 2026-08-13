@@ -23,14 +23,9 @@ class Project
     std::vector<Target *> m_topLevelTargets;
     std::vector<PropertyObject> m_globalProperties;
 
-    class SourceLoc : private std::source_location
-    {
-        friend class Project;
-        SourceLoc(std::source_location sl) : std::source_location::source_location(sl) {}
-    };
-
 public:
-    Project(std::string name, Config config, SourceLoc mainFile = std::source_location::current());
+    Project(std::string name, Config config,
+            std::source_location mainFile = std::source_location::current());
 
     std::string_view name() const noexcept { return m_name; }
     const Config &config() const noexcept { return m_config; }

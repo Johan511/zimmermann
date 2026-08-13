@@ -15,7 +15,7 @@ namespace fs = std::filesystem;
 
 namespace zimm
 {
-Project::Project(std::string name, Config config, SourceLoc mainFile)
+Project::Project(std::string name, Config config, std::source_location mainFile)
     : m_name(std::move(name)), m_config(std::move(config)),
       m_featureDetectionDir(m_config.build_dir), m_installer(m_config.build_dir),
       m_mainFilePath(mainFile.file_name())
