@@ -24,7 +24,7 @@ public:
     }
     void install_lib(StaticLibrary *lib)
     {
-        m_installMap["lib"].push_back(m_buildDir.make(std::string{lib->name()} + ".a"));
+        m_installMap["lib"].push_back(m_buildDir.make("lib" + std::string{lib->name()} + ".a"));
     }
     void install_headers(Directory headersDir, std::string includeSubDir = "")
     {

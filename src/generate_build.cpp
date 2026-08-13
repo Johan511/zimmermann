@@ -29,7 +29,7 @@ std::string ninja_target_name(const Target &target)
     case TargetType::Executable:
         return std::string{target.name()};
     case TargetType::StaticLibrary:
-        return std::format("{}.a", target.name());
+        return std::format("lib{}.a", target.name());
     case TargetType::SharedLibrary:
         return std::format("lib{}.so", target.name());
     case TargetType::ThirdPartyTarget:
@@ -191,8 +191,9 @@ void generate_build(Project &project)
     out << "  command = " << ar << " rcs $out $in\n";
     out << "  description = AR $out\n\n";
 
+    out << "# `$in` is objects to be linked together\n";
     out << "rule link\n";
-    out << "  command = " << ld << " $in -o $out $ldflags\n";
+    out << "  command = " << ld << " $in $libs -o $out $ldflags\n";
     out << "  description = LINK $out\n\n";
 
     out << "rule run_cmd\n";
@@ -281,11 +282,12 @@ void generate_build(Project &project)
         case TargetType::SharedLibrary:
         {
             auto &lib = static_cast<const SharedLibrary &>(target);
-            out << "build " << ninja_target_name(lib) << ": link " << sourceObjectsNinjaNames << " "
-                << linkSourcesNinjaNames;
+            out << "build " << ninja_target_name(lib) << ": link " << sourceObjectsNinjaNames;
             if (!depsEnsured) out << " | " << depList;
             out << '\n';
-            out << "  ldflags = -shared " << globalLinkFlags << " " << localLinkFlags << "\n\n";
+            out << "  ldflags = -shared " << globalLinkFlags << " " << localLinkFlags << "\n";
+            out << "  libs = -Wl,--whole-archive " << linkSourcesNinjaNames
+                << "-Wl,--no-whole-archive\n\n";
             break;
         }
         case TargetType::Executable:
