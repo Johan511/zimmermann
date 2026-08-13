@@ -9,8 +9,8 @@ using namespace zimm;
 
 int main()
 {
-    auto cfg = Config{};
-    Project prj{"Complex Example", std::move(cfg)};
+    auto cfg = make_config();
+    Project prj{"Complex Example", std::move(cfg.value())};
 
     auto libcore = define_libcore();
     auto libmath = define_libmath(libcore.get());

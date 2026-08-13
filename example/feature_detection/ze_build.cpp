@@ -4,8 +4,8 @@ using namespace zimm;
 
 int main()
 {
-    auto cfg = Config{};
-    Project prj{"Feature Detection", std::move(cfg)};
+    auto cfg = make_config();
+    Project prj{"Feature Detection", std::move(cfg.value())};
 
     auto app = make_executable("feature_detect");
     app->add_source(rel_path("main.cpp"));

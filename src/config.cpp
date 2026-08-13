@@ -1,8 +1,14 @@
 #include "../includes/zimm/config.hpp"
+#include "zimm/logger.hpp"
 #include <format>
+#include <iomanip>
+#include <meta>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
+
+namespace meta = std::meta;
+namespace fs = std::filesystem;
 
 namespace zimm
 {
@@ -69,61 +75,55 @@ std::string_view resolve_host_hardware()
 }
 } // namespace
 
+consteval bool is_append_field(meta::info info)
+{
+    static constexpr auto appendFieldsList = {^^Config::c_flags, ^^Config::cxx_flags};
+    for (const auto field : appendFieldsList)
+        if (info == field) return true;
+    return false;
+}
+
 std::optional<Config> make_config(int argc, char *argv[])
 try
 {
     Config cfg;
+
+    // Set defaults
+    cfg.build_dir = fs::current_path().string() + "/";
+    cfg.install_dir = (fs::current_path().parent_path() / "install").string() + "/";
+    cfg.flags_debug = "-g";
+    cfg.flags_release = "-O3 -DNDEBUG";
+    cfg.flags_relwithdebinfo = "-O3 -g -DNDEBUG";
+    cfg.flags_minsizerel = "-Os -DNDEBUG";
+    cfg.build_type = "relwithdebinfo";
+    cfg.os = resolve_host_os();
+    cfg.hardware = resolve_host_hardware();
+
     for (const auto &[key, value] : ArgsParser(argc, argv))
     {
-        if (key == "c_flags") cfg.c_flags += value;
-        else if (key == "cxx_flags") cfg.cxx_flags += value;
-        else if (key == "c_cxx_flags")
+        bool matched = false;
+
+        template for (constexpr auto member :
+                      std::define_static_array(meta::nonstatic_data_members_of(
+                          ^^decltype(cfg), meta::access_context::current())))
         {
-            cfg.c_flags += value;
-            cfg.cxx_flags += value;
+            constexpr std::string_view memberName = meta::identifier_of(member);
+            if (memberName != key) continue;
+
+            if constexpr (is_append_field(member)) cfg.[:member:] += value;
+            else if constexpr (member != ^^Config::misc) cfg.[:member:] = value;
+            else LOGF("Invalid key: misc is being ignored");
+
+            matched = true;
         }
-        else if (key == "build_dir") cfg.build_dir = value;
-        else if (key == "install_dir") cfg.install_dir = value;
-        else if (key == "build_type")
-        {
-            if (value == "debug")
-            {
-                cfg.cxx_flags += cfg.flags_debug;
-                cfg.c_flags += cfg.flags_debug;
-            }
-            else if (value == "release")
-            {
-                cfg.cxx_flags += cfg.flags_release;
-                cfg.c_flags += cfg.flags_release;
-            }
-            else if (value == "relwithdebinfo")
-            {
-                cfg.cxx_flags += cfg.flags_relwithdebinfo;
-                cfg.c_flags += cfg.flags_relwithdebinfo;
-            }
-            else if (value == "minsizerel")
-            {
-                cfg.cxx_flags += cfg.flags_minsizerel;
-                cfg.c_flags += cfg.flags_minsizerel;
-            }
-            else
-            {
-                throw std::invalid_argument(std::format(
-                    "invalid_argument: for key='{}', value='{}' not allowed", value, key));
-            }
-        }
-        else if (key == "flags_debug") cfg.flags_debug = value;
-        else if (key == "flags_release") cfg.flags_release = value;
-        else if (key == "flags_relwithdebinfo") cfg.flags_relwithdebinfo = value;
-        else if (key == "flags_minsizerel") cfg.flags_minsizerel = value;
-        else if (key == "toolchain_prefix") cfg.toolchain_prefix = value;
-        else if (key == "os") cfg.os = value;
-        else if (key == "hardware") cfg.hardware = value;
-        else cfg.misc[std::string{key}] = value;
+
+        if (!matched) cfg.misc[std::string{key}] = value;
     }
 
-    if (cfg.os.empty()) cfg.os = resolve_host_os();
-    if (cfg.hardware.empty()) cfg.hardware = resolve_host_hardware();
+    // make sure the ordering of these depenedent defaults is correct
+    // dependent defaults (defaults which depend on other variables)
+    if (cfg.compile_commands_path.empty())
+        cfg.compile_commands_path = fs::path{cfg.build_dir} / "compile_commands.json";
 
     return cfg;
 }
@@ -131,4 +131,7 @@ catch (...)
 {
     return std::nullopt;
 }
+
+std::optional<Config> make_config() { return make_config(0, nullptr); }
+
 } // namespace zimm

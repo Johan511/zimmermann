@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <set>
 #include <stack>
@@ -21,6 +22,19 @@ Project::Project(std::string name, Config config, SourceLoc mainFile)
 {
     fs::create_directories(m_config.build_dir);
     fs::create_directories(fs::path{m_featureDetectionDir.path()});
+
+    // clang-format off
+    if (m_config.build_type == "debug")
+        add_global_property(CompileFlagProperty{m_config.flags_debug});
+    else if (m_config.build_type == "release")
+        add_global_property(CompileFlagProperty{m_config.flags_release});
+    else if (m_config.build_type == "relwithdebinfo")
+        add_global_property(CompileFlagProperty{m_config.flags_relwithdebinfo});
+    else if (m_config.build_type == "minsizerel")
+        add_global_property(CompileFlagProperty{m_config.flags_minsizerel});
+    else
+        LOGF("Invalid build type: " << std::quoted(m_config.build_type));
+    // clang-format on
 }
 
 std::unordered_set<Target *> Project::seach_all_targets() const

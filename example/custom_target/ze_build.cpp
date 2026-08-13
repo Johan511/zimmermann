@@ -17,8 +17,8 @@ struct AdderGen
 
 int main()
 {
-    auto cfg = Config{};
-    Project prj{"Custom Target Example", std::move(cfg)};
+    auto cfg = make_config();
+    Project prj{"Custom Target Example", std::move(cfg.value())};
 
     // --- Custom target: run adder.py to generate adder.h + adder.cpp ---
     auto gen = make_custom_target<AdderGen>("adder", Directory{std::string{prj.build_dir()}});

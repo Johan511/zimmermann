@@ -16,6 +16,7 @@ add_library(zimmermann STATIC
     src/generate_build.cpp
     src/third_party_target.cpp
 )
+target_compile_options(zimmermann PRIVATE "-freflection")
 target_compile_definitions(zimmermann PRIVATE
     ZIMM_BUILDING_LIB
     CMAKE_HOST_OS="${CMAKE_HOST_SYSTEM_NAME}"

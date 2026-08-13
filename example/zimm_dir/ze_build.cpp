@@ -22,7 +22,7 @@ int main()
         return 1;
     }
 
-    Project prj{"zimm_dir", Config{}};
+    Project prj{"zimm_dir", make_config().value()};
 
     auto exec = make_executable("zimm_dir");
     exec->add_source(rel_path("main.cpp"));

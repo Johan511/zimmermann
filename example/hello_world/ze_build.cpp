@@ -4,8 +4,8 @@ using namespace zimm;
 
 int main()
 {
-    auto cfg = Config{};
-    Project prj{"Hello World", std::move(cfg)};
+    auto cfg = make_config();
+    Project prj{"Hello World", std::move(cfg.value())};
     prj.add_global_property(CompileFlagProperty{"-std=c++23"});
 
     auto helloWorld = make_executable("HelloWorld");

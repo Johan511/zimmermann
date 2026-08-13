@@ -150,10 +150,13 @@ void generate_build(Project &project)
         if (metaCmd.empty()) continue;
 
         std::string metaStamp = std::format("{}{}.meta.stamp", project.build_dir(), t->name());
+        std::cout << metaStamp << '\n';
         if (fs::exists(metaStamp)) continue;
 
         fs::create_directories(fs::path{tpt.dir()});
         std::string cmd = std::format("(cd {} && {}) && touch {}", tpt.dir(), metaCmd, metaStamp);
+        std::cout << cmd << '\n';
+
         if (std::system(cmd.c_str()) != 0)
             LOGF("Warning: meta-build step for '" << tpt.name() << "' failed");
     }

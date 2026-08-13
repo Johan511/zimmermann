@@ -4,8 +4,8 @@ using namespace zimm;
 
 int main()
 {
-    auto cfg = Config{};
-    Project prj{"ZeTest", std::move(cfg)};
+    auto cfg = make_config();
+    Project prj{"ZeTest", std::move(cfg.value())};
     prj.add_global_property(CompileFlagProperty{"-std=c++23"});
 
     auto demo = make_executable("ze_test");
