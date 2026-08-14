@@ -5,6 +5,7 @@
 #include "path.hpp"
 #include "properties.hpp"
 
+#include <initializer_list>
 #include <span>
 #include <string>
 #include <vector>
@@ -46,10 +47,16 @@ public:
         if (!utils::is_valid_source(source)) LOGF("invalid source = " << std::quoted(source));
         m_sources.push_back(std::move(source));
     }
+    void add_sources(std::initializer_list<std::string> sources)
+    {
+        for (const auto &source : sources) add_source(source);
+    }
     std::span<const std::string> sources() const noexcept { return m_sources; }
 
     void link_with(const PublicTag *, Library *linkLib);
     void link_with(const PrivateTag *, Library *linkLib);
+    void link_with(const PublicTag *, std::initializer_list<Library *> linkLibs);
+    void link_with(const PrivateTag *, std::initializer_list<Library *> linkLibs);
     virtual ~SourcesTrait() = default;
 };
 
@@ -170,8 +177,16 @@ public:
     }
 
     void add_input(std::string input) { m_inputs.push_back(std::move(input)); }
+    void add_inputs(std::initializer_list<std::string> inputs)
+    {
+        for (const auto &input : inputs) add_input(input);
+    }
     // TODO: fix the paths
     void add_output(std::string output) { m_outputs.push_back(std::move(output)); }
+    void add_outputs(std::initializer_list<std::string> outputs)
+    {
+        for (const auto &output : outputs) add_output(output);
+    }
 
     std::string generate_cmd() const override { return CustomTargetTag::cmd(m_inputs, m_outputs); }
     std::span<const std::string> inputs() const override { return m_inputs; }
@@ -198,7 +213,6 @@ inline LeakyPtr<SharedLibrary> make_shared_library(std::string name)
 }
 
 template <CustomTargetTagConcept T>
-
 inline LeakyPtr<CustomTarget<T>> make_custom_target(std::string name, Directory dir)
 {
     return LeakyPtr<CustomTarget<T>>(new CustomTarget<T>{std::move(name), std::move(dir)});

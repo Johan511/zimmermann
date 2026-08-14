@@ -23,14 +23,12 @@ int main()
     // --- Custom target: run adder.py to generate adder.h + adder.cpp ---
     auto gen = make_custom_target<AdderGen>("adder", Directory{std::string{prj.build_dir()}});
     gen->add_input(rel_path("adder.py"));
-    gen->add_output(gen->dir().make("adder.h"));
-    gen->add_output(gen->dir().make("adder.cpp"));
+    gen->add_outputs({gen->dir().make("adder.h"), gen->dir().make("adder.cpp")});
     gen->add_property(public_, IncludeProperty{std::string{gen->dir().path()}});
 
     // --- Executable ---
     auto app = make_executable("a");
-    app->add_source(rel_path("a.cpp"));
-    app->add_source(gen->dir().make("adder.cpp"));
+    app->add_sources({rel_path("a.cpp"), gen->dir().make("adder.cpp")});
     add_dependency_rel(app.get(), gen.get());
 
     prj.register_top_level_target(app.get());

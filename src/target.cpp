@@ -79,4 +79,14 @@ void detail::SourcesTrait::link_with(const PrivateTag *, Library *linkLib)
     thisTarget->add_property(private_, LinkTargetProperty{linkLib});
 }
 
+void detail::SourcesTrait::link_with(const PublicTag *, std::initializer_list<Library *> linkLibs)
+{
+    for (auto *linkLib : linkLibs) link_with(public_, linkLib);
+}
+
+void detail::SourcesTrait::link_with(const PrivateTag *, std::initializer_list<Library *> linkLibs)
+{
+    for (auto *linkLib : linkLibs) link_with(private_, linkLib);
+}
+
 } // namespace zimm

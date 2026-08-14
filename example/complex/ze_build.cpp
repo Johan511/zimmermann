@@ -20,8 +20,7 @@ int main()
     prj.add_global_property(IncludeProperty{rel_path("include")});
     prj.add_global_property(CompileFlagProperty{"-std=c++23"});
 
-    prj.register_top_level_target(myapp.get());
-    prj.register_top_level_target(libnetwork.get());
+    prj.register_top_level_targets({myapp.get(), libnetwork.get()});
 
     prj.installer().install_binary(myapp.get());
     prj.installer().install_lib(libnetwork.get());

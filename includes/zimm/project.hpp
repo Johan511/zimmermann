@@ -5,6 +5,7 @@
 #include "target.hpp"
 #include "tester.hpp"
 #include <cassert>
+#include <initializer_list>
 #include <optional>
 #include <source_location>
 #include <span>
@@ -38,8 +39,15 @@ public:
     Tester &tester() noexcept { return m_tester; }
 
     void register_top_level_target(Target *target) { m_topLevelTargets.emplace_back(target); }
+    void register_top_level_targets(std::initializer_list<Target *> targets)
+    {
+        for (auto *target : targets) register_top_level_target(target);
+    }
     std::span<Target *const> top_level_targets() const noexcept { return m_topLevelTargets; }
-    void add_global_property(PropertyObject property) { m_globalProperties.push_back(property); }
+    void add_global_property(PropertyObject property)
+    {
+        m_globalProperties.push_back(std::move(property));
+    }
 
     std::string_view build_dir() { return m_config.build_dir; }
 
