@@ -23,7 +23,7 @@ struct MetaBuildCmd
 
 template <typename Strategy>
 concept ThirdPartyTargetStrategy = requires(const Strategy &s) {
-    { s.attempt(std::string_view{} /* name */) } -> std::same_as<LeakyPtr<class ThirdPartyTarget>>;
+    { s.attempt(std::string_view{} /* name */) } -> std::same_as<class ThirdPartyTarget *>;
 };
 
 class ThirdPartyTarget : public Target
@@ -37,25 +37,25 @@ class ThirdPartyTarget : public Target
 
 public:
     template <ThirdPartyTargetStrategy... Strategies>
-    static LeakyPtr<ThirdPartyTarget> make(std::string name, const Strategies &...strategies)
+    static ThirdPartyTarget *make(std::string name, const Strategies &...strategies)
     {
         static_assert(sizeof...(strategies) > 0);
-        LeakyPtr<ThirdPartyTarget> result{};
+        ThirdPartyTarget *result = nullptr;
         if (!(... || (result = strategies.attempt(name), result)))
             LOGI("Failed to make third party target");
         return result;
     }
 
-    static LeakyPtr<ThirdPartyTarget> make(std::string name, Directory dir,
-                                           MetaBuildCmd metaBuildCmd = {}, BuildCmd buildCmd = {})
+    static ThirdPartyTarget *make(std::string name, Directory dir, MetaBuildCmd metaBuildCmd = {},
+                                  BuildCmd buildCmd = {})
     {
-        return LeakyPtr<ThirdPartyTarget>(new ThirdPartyTarget{
-            std::move(name), std::move(dir), std::move(metaBuildCmd), std::move(buildCmd)});
+        return new ThirdPartyTarget{std::move(name), std::move(dir), std::move(metaBuildCmd),
+                                    std::move(buildCmd)};
     }
 
-    LeakyPtr<Executable> assume_executable(std::string name, std::string pathRelToTptDir);
-    LeakyPtr<StaticLibrary> assume_static_library(std::string name, std::string pathRelToTptDir);
-    LeakyPtr<SharedLibrary> assume_shared_library(std::string name, std::string pathRelToTptDir);
+    Executable *assume_executable(std::string name, std::string pathRelToTptDir);
+    StaticLibrary *assume_static_library(std::string name, std::string pathRelToTptDir);
+    SharedLibrary *assume_shared_library(std::string name, std::string pathRelToTptDir);
 
     std::string_view meta_build_cmd() const noexcept { return m_metaBuildCmd; }
     std::string_view build_cmd() const noexcept { return m_buildCmd; }
@@ -72,7 +72,7 @@ public:
     FindPackageTptStrategy(std::string searchPath);
     FindPackageTptStrategy(std::vector<std::string> searchPaths);
     FindPackageTptStrategy();
-    LeakyPtr<ThirdPartyTarget> attempt(std::string_view name) const;
+    ThirdPartyTarget *attempt(std::string_view name) const;
 };
 
 class FetchContentTptStrategy
@@ -85,7 +85,7 @@ class FetchContentTptStrategy
 public:
     FetchContentTptStrategy(Directory dir, std::string fetchContentCmd, MetaBuildCmd metaBuildCmd,
                             BuildCmd buildCmd);
-    LeakyPtr<ThirdPartyTarget> attempt(std::string_view name) const;
+    ThirdPartyTarget *attempt(std::string_view name) const;
 };
 
 static_assert(ThirdPartyTargetStrategy<FindPackageTptStrategy>);

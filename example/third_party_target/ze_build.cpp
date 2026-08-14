@@ -49,12 +49,12 @@ int main()
 
     auto app = make_executable("tpt_demo");
     app->add_source(rel_path("main.cpp"));
-    app->link_with(private_, myLib.get());
-    app->link_with(private_, gtestLib.get());
-    add_dependency_rel(app.get(), httpLibTpt.get());
+    app->link_with(private_, myLib);
+    app->link_with(private_, gtestLib);
+    add_dependency_rel(app, httpLibTpt);
 
-    prj.register_top_level_target(app.get());
-    prj.installer().install_binary(app.get());
+    prj.register_top_level_target(app);
+    prj.installer().install_binary(app);
 
     generate_build(prj);
 }

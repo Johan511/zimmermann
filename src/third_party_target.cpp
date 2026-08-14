@@ -16,7 +16,7 @@ FindPackageTptStrategy::FindPackageTptStrategy(std::vector<std::string> searchPa
 
 FindPackageTptStrategy::FindPackageTptStrategy() : FindPackageTptStrategy(defaultPaths) {}
 
-LeakyPtr<class ThirdPartyTarget> FindPackageTptStrategy::attempt(std::string_view name) const
+ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
 {
     namespace fs = std::filesystem;
 
@@ -58,7 +58,7 @@ FetchContentTptStrategy::FetchContentTptStrategy(Directory dir, std::string fetc
 {
 }
 
-LeakyPtr<class ThirdPartyTarget> FetchContentTptStrategy::attempt(std::string_view name) const
+ThirdPartyTarget *FetchContentTptStrategy::attempt(std::string_view name) const
 {
     namespace fs = std::filesystem;
 
@@ -78,30 +78,29 @@ ThirdPartyTarget::ThirdPartyTarget(std::string name, Directory dir, MetaBuildCmd
 {
 }
 
-LeakyPtr<Executable> ThirdPartyTarget::assume_executable(std::string name,
-                                                         std::string pathRelToTptDir)
+Executable *ThirdPartyTarget::assume_executable(std::string name, std::string pathRelToTptDir)
 {
     auto target = make_executable(std::move(name));
-    add_dependency_rel(target.get(), this);
-    target.get()->m_assumedPath = m_dir.make(pathRelToTptDir);
+    add_dependency_rel(target, this);
+    target->m_assumedPath = m_dir.make(pathRelToTptDir);
     return target;
 }
 
-LeakyPtr<StaticLibrary> ThirdPartyTarget::assume_static_library(std::string name,
-                                                                std::string pathRelToTptDir)
+StaticLibrary *ThirdPartyTarget::assume_static_library(std::string name,
+                                                       std::string pathRelToTptDir)
 {
     auto target = make_static_library(std::move(name));
-    add_dependency_rel(target.get(), this);
-    target.get()->m_assumedPath = m_dir.make(pathRelToTptDir);
+    add_dependency_rel(target, this);
+    target->m_assumedPath = m_dir.make(pathRelToTptDir);
     return target;
 }
 
-LeakyPtr<SharedLibrary> ThirdPartyTarget::assume_shared_library(std::string name,
-                                                                std::string pathRelToTptDir)
+SharedLibrary *ThirdPartyTarget::assume_shared_library(std::string name,
+                                                       std::string pathRelToTptDir)
 {
     auto target = make_shared_library(std::move(name));
-    add_dependency_rel(target.get(), this);
-    target.get()->m_assumedPath = m_dir.make(pathRelToTptDir);
+    add_dependency_rel(target, this);
+    target->m_assumedPath = m_dir.make(pathRelToTptDir);
     return target;
 }
 

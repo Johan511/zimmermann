@@ -197,25 +197,22 @@ public:
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // FACTORIES
 
-inline LeakyPtr<Executable> make_executable(std::string name)
+inline Executable *make_executable(std::string name) { return new Executable{std::move(name)}; }
+
+inline StaticLibrary *make_static_library(std::string name)
 {
-    return LeakyPtr<Executable>(new Executable{std::move(name)});
+    return new StaticLibrary{std::move(name)};
 }
 
-inline LeakyPtr<StaticLibrary> make_static_library(std::string name)
+inline SharedLibrary *make_shared_library(std::string name)
 {
-    return LeakyPtr<StaticLibrary>(new StaticLibrary{std::move(name)});
-}
-
-inline LeakyPtr<SharedLibrary> make_shared_library(std::string name)
-{
-    return LeakyPtr<SharedLibrary>(new SharedLibrary{std::move(name)});
+    return new SharedLibrary{std::move(name)};
 }
 
 template <CustomTargetTagConcept T>
-inline LeakyPtr<CustomTarget<T>> make_custom_target(std::string name, Directory dir)
+inline CustomTarget<T> *make_custom_target(std::string name, Directory dir)
 {
-    return LeakyPtr<CustomTarget<T>>(new CustomTarget<T>{std::move(name), std::move(dir)});
+    return new CustomTarget<T>{std::move(name), std::move(dir)};
 }
 
 } // namespace zimm

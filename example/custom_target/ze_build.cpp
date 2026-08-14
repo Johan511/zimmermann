@@ -29,10 +29,10 @@ int main()
     // --- Executable ---
     auto app = make_executable("a");
     app->add_sources({rel_path("a.cpp"), gen->dir().make("adder.cpp")});
-    add_dependency_rel(app.get(), gen.get());
+    add_dependency_rel(app, gen);
 
-    prj.register_top_level_target(app.get());
-    prj.installer().install_binary(app.get());
+    prj.register_top_level_target(app);
+    prj.installer().install_binary(app);
 
     generate_build(prj);
 }

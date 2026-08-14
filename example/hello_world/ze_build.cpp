@@ -12,13 +12,13 @@ int main()
     helloWorld->add_property(public_, IncludeProperty{rel_path("include")});
     helloWorld->add_source(rel_path("hello_world.cpp"));
 
-    prj.register_top_level_target(helloWorld.get());
+    prj.register_top_level_target(helloWorld);
 
-    prj.installer().install_binary(helloWorld.get());
+    prj.installer().install_binary(helloWorld);
     prj.installer().install_headers(Directory{rel_path("include")});
 
     Tester &tester = prj.tester();
-    tester.add_test(helloWorld.get());
+    tester.add_test(helloWorld);
 
     generate_build(prj);
 }

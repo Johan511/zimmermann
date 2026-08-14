@@ -27,8 +27,8 @@ int main()
     auto exec = make_executable("zimm_dir");
     exec->add_source(rel_path("main.cpp"));
 
-    prj.register_top_level_target(exec.get());
-    prj.installer().install_binary(exec.get());
+    prj.register_top_level_target(exec);
+    prj.installer().install_binary(exec);
 
     generate_build(prj);
 }

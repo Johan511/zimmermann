@@ -42,7 +42,7 @@ int main()
     if (auto sz = prj.check_type_size("void*", {}))
         app->add_property(private_, CompileFlagProperty{"-DPTR_SIZE=" + std::to_string(*sz)});
 
-    prj.register_top_level_target(app.get());
-    prj.installer().install_binary(app.get());
+    prj.register_top_level_target(app);
+    prj.installer().install_binary(app);
     generate_build(prj);
 }

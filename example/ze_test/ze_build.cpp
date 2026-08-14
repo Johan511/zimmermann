@@ -10,20 +10,20 @@ int main()
 
     auto demo = make_executable("ze_test");
     demo->add_source(rel_path("main.cpp"));
-    prj.register_top_level_target(demo.get());
-    prj.installer().install_binary(demo.get());
+    prj.register_top_level_target(demo);
+    prj.installer().install_binary(demo);
 
     auto testPass = make_executable("test_pass");
     testPass->add_source(rel_path("test_pass.cpp"));
-    prj.register_top_level_target(testPass.get());
+    prj.register_top_level_target(testPass);
 
     auto testArgs = make_executable("test_args");
     testArgs->add_source(rel_path("test_args.cpp"));
-    prj.register_top_level_target(testArgs.get());
+    prj.register_top_level_target(testArgs);
 
     Tester &tester = prj.tester();
-    tester.add_test(testPass.get());
-    tester.add_test(testArgs.get(), "hello", 42);
+    tester.add_test(testPass);
+    tester.add_test(testArgs, "hello", 42);
 
     generate_build(prj);
 }
