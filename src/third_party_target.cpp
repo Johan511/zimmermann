@@ -2,16 +2,16 @@
 
 namespace zimm
 {
-std::vector<std::string> FindPackageTptStrategy::defaultPaths = {"/usr/"};
+std::vector<Directory> FindPackageTptStrategy::defaultPaths = {Directory{"/usr"}};
 
-FindPackageTptStrategy::FindPackageTptStrategy(std::string searchPath)
+FindPackageTptStrategy::FindPackageTptStrategy(Directory searchPath)
 {
-    m_searchPaths.push_back(std::move(searchPath));
+    m_searchDirs.push_back(std::move(searchPath));
 }
 
-FindPackageTptStrategy::FindPackageTptStrategy(std::vector<std::string> searchPaths)
+FindPackageTptStrategy::FindPackageTptStrategy(std::vector<Directory> searchPaths)
 {
-    for (auto &searchPath : searchPaths) m_searchPaths.push_back(std::move(searchPath));
+    for (auto &searchPath : searchPaths) m_searchDirs.push_back(std::move(searchPath));
 }
 
 FindPackageTptStrategy::FindPackageTptStrategy() : FindPackageTptStrategy(defaultPaths) {}
@@ -20,19 +20,13 @@ ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
 {
     namespace fs = std::filesystem;
 
-    for (std::string_view pathStr : m_searchPaths)
+    for (const Directory &searchDir : m_searchDirs)
     {
-        if (pathStr.empty()) continue;
-
-        // ensure there is no trailing slash because path{"/foo/bar/"}.filename() == ""
-        if (pathStr.back() == '/') pathStr.remove_suffix(1);
-
-        fs::path path{pathStr};
+        const fs::path &path = searchDir.path();
         if (!fs::is_directory(path)) continue;
 
-        if (path.has_filename() /* handling the retarded case where path is "/" */
-            && path.filename().c_str() == name)
-            return ThirdPartyTarget::make(std::string{name}, Directory{std::string{path}});
+        if (path.has_filename() && path.filename().c_str() == name)
+            return ThirdPartyTarget::make(std::string{name}, searchDir);
 
         using fs::directory_options::skip_permission_denied;
         // TODO: do we need follow_directory_symlink?
@@ -41,11 +35,8 @@ ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
         {
             if (!child.is_directory()) continue;
             const fs::path &childPath = child.path();
-
-            /* no need special folder name handling as directory_iterator
-             * always returns path without trailing slashes */
             if (childPath.filename().c_str() != name) continue;
-            return ThirdPartyTarget::make(std::string{name}, Directory{childPath.string()});
+            return ThirdPartyTarget::make(std::string{name}, Directory{childPath});
         }
     }
     return nullptr;
@@ -65,8 +56,9 @@ ThirdPartyTarget *FetchContentTptStrategy::attempt(std::string_view name) const
     fs::create_directories(m_dir.path());
     std::string fetchContentCmd = m_fetchContentCmd.empty() ? "true" : m_fetchContentCmd;
     std::string metaBuildCmd = m_metaBuildCmd.cmd.empty() ? "true" : m_metaBuildCmd.cmd;
-    MetaBuildCmd fetchAndMetaBuild = MetaBuildCmd{std::format(
-        "cd {} && {} && {}", m_dir.path(), std::move(fetchContentCmd), std::move(metaBuildCmd))};
+    MetaBuildCmd fetchAndMetaBuild =
+        MetaBuildCmd{std::format("cd {} && {} && {}", m_dir.path().string(),
+                                 std::move(fetchContentCmd), std::move(metaBuildCmd))};
     return ThirdPartyTarget::make(std::string{name}, m_dir, std::move(fetchAndMetaBuild),
                                   m_buildCmd);
 }
@@ -82,7 +74,7 @@ Executable *ThirdPartyTarget::assume_executable(std::string name, std::string pa
 {
     auto target = make_executable(std::move(name));
     add_dependency_rel(target, this);
-    target->m_assumedPath = m_dir.make(pathRelToTptDir);
+    target->m_assumedPath = m_dir.file(pathRelToTptDir);
     return target;
 }
 
@@ -91,7 +83,7 @@ StaticLibrary *ThirdPartyTarget::assume_static_library(std::string name,
 {
     auto target = make_static_library(std::move(name));
     add_dependency_rel(target, this);
-    target->m_assumedPath = m_dir.make(pathRelToTptDir);
+    target->m_assumedPath = m_dir.file(pathRelToTptDir);
     return target;
 }
 
@@ -100,7 +92,7 @@ SharedLibrary *ThirdPartyTarget::assume_shared_library(std::string name,
 {
     auto target = make_shared_library(std::move(name));
     add_dependency_rel(target, this);
-    target->m_assumedPath = m_dir.make(pathRelToTptDir);
+    target->m_assumedPath = m_dir.file(pathRelToTptDir);
     return target;
 }
 

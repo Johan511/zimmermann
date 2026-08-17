@@ -34,7 +34,7 @@ public:
     {
         return m_globalProperties;
     }
-    std::string_view main_file_path() const noexcept { return m_mainFilePath; }
+    const File &main_file_path() const noexcept { return m_mainFilePath; }
     Installer &installer() noexcept { return m_installer; }
     Tester &tester() noexcept { return m_tester; }
 
@@ -49,7 +49,7 @@ public:
         m_globalProperties.push_back(std::move(property));
     }
 
-    std::string_view build_dir() { return m_config.build_dir; }
+    const Directory &build_dir() { return m_config.build_dir; }
 
     std::unordered_set<Target *> seach_all_targets() const;
 
@@ -67,7 +67,7 @@ private:
     Installer m_installer;
     Tester m_tester;
 
-    std::string m_mainFilePath;
+    File m_mainFilePath;
 };
 
 void generate_build(Project &project);

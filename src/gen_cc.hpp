@@ -1,5 +1,8 @@
 #pragma once
 
+#include "../includes/zimm/path.hpp"
+
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -8,8 +11,8 @@ namespace zimm
 
 struct CCEntry
 {
-    std::string directory;
-    std::string file;
+    Directory directory;
+    File file;
     std::string command;
 };
 
@@ -18,7 +21,7 @@ class GenCc
     std::vector<CCEntry> m_entries;
 
 public:
-    void add_entry(std::string directory, std::string file, std::string command);
+    void add_entry(Directory directory, File file, std::string command);
     void write(std::ofstream &ofs);
 };
 

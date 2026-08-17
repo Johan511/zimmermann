@@ -1,5 +1,6 @@
 #pragma once
 
+#include "path.hpp"
 #include <filesystem>
 #include <source_location>
 
@@ -22,15 +23,14 @@ It may only reach user code through the final zimm.hpp. Do not include it (or zi
 namespace zimm
 {
 
-__attribute__((weak)) std::string zimm_dir()
+__attribute__((weak)) Directory zimm_dir()
 {
     namespace fs = std::filesystem;
     auto loc = std::source_location::current();
-    return fs::path{fs::absolute(loc.file_name())} // "install/zimm/include/<file>"
-        .parent_path()                             // "install/zimm/include/"
-        .parent_path()                             // "install/zimm/"
-        .parent_path()                             // "install"
-        .string();
+    return Directory{fs::path{fs::absolute(loc.file_name())} // "install/zimm/include/<file>"
+                         .parent_path()                      // "install/zimm/include/"
+                         .parent_path()                      // "install/zimm/"
+                         .parent_path()};                    // "install"
 }
 
 } // namespace zimm

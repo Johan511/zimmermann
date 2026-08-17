@@ -21,8 +21,8 @@ void Target::add_property_impl(std::vector<PropertyObject> &properties, Property
         switch (a.type())
         {
         case PropertyType::Include:
-            return static_cast<const IncludeProperty &>(a).include_path() ==
-                   static_cast<const IncludeProperty &>(b).include_path();
+            return static_cast<const IncludeProperty &>(a).include_path().path() ==
+                   static_cast<const IncludeProperty &>(b).include_path().path();
         case PropertyType::CompileFlag:
             return static_cast<const CompileFlagProperty &>(a).flag() ==
                    static_cast<const CompileFlagProperty &>(b).flag();

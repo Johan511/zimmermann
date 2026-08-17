@@ -17,14 +17,14 @@ int main()
     auto libnetwork = define_libnetwork(libcore);
     auto myapp = define_myapp(libcore, libmath, libnetwork);
 
-    prj.add_global_property(IncludeProperty{rel_path("include")});
+    prj.add_global_property(IncludeProperty{rel_dir("include")});
     prj.add_global_property(CompileFlagProperty{"-std=c++23"});
 
     prj.register_top_level_targets({myapp, libnetwork});
 
     prj.installer().install_binary(myapp);
     prj.installer().install_lib(libnetwork);
-    prj.installer().install_headers(Directory{rel_path("include")});
+    prj.installer().install("include", rel_dir("include"));
 
     generate_build(prj);
 }
