@@ -47,7 +47,7 @@ static std::string json_escape(std::string_view s)
     return out;
 }
 
-void GenCc::add_entry(std::string directory, std::string file, std::string command)
+void GenCc::add_entry(Directory directory, File file, std::string command)
 {
     m_entries.emplace_back(std::move(directory), std::move(file), std::move(command));
 }
@@ -61,8 +61,8 @@ void GenCc::write(std::ofstream &out)
     {
         auto &e = m_entries[i];
         out << "  {\n";
-        out << "    \"directory\": \"" << json_escape(e.directory) << "\",\n";
-        out << "    \"file\": \"" << json_escape(e.file) << "\",\n";
+        out << "    \"directory\": \"" << json_escape(e.directory.path().string()) << "\",\n";
+        out << "    \"file\": \"" << json_escape(e.file.path().string()) << "\",\n";
         out << "    \"command\": \"" << json_escape(e.command) << "\"\n";
         out << "  }";
         if (i + 1 < m_entries.size()) out << ",";

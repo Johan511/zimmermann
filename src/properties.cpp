@@ -6,8 +6,8 @@ namespace zimm
 
 Property::Property(PropertyType type) : m_type(type) {}
 
-IncludeProperty::IncludeProperty(std::string_view includePath)
-    : Property(PropertyType::Include), m_includePath(std::string{includePath})
+IncludeProperty::IncludeProperty(Directory includePath)
+    : Property(PropertyType::Include), m_includePath(std::move(includePath))
 {
 }
 

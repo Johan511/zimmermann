@@ -1,6 +1,5 @@
 #pragma once
 
-#include "logger.hpp"
 #include <filesystem>
 #include <source_location>
 #include <string>
@@ -9,40 +8,52 @@
 namespace zimm
 {
 
-namespace detail
+class File
 {
+    std::filesystem::path m_path;
 
-static inline bool is_rel_path(std::string_view path) { return !path.empty() && path[0] != '/'; }
-inline std::string get_absolute_path(std::string_view path, std::source_location location)
-{
-    std::filesystem::path caller_file = location.file_name();
-    std::filesystem::path caller_dir = caller_file.parent_path();
-    return (caller_dir / path).lexically_normal().string();
-}
-
-} // namespace detail
-
-static inline std::string rel_path(std::string relPath,
-                                   std::source_location loc = std::source_location::current())
-{
-    return detail::get_absolute_path(relPath, loc);
-}
+public:
+    explicit File(std::filesystem::path path) : m_path(std::move(path)) {}
+    std::filesystem::path path() && { return std::move(m_path); }
+    const std::filesystem::path &path() const & { return m_path; }
+};
 
 class Directory
 {
-    std::string m_dirPath;
+    std::filesystem::path m_path;
 
 public:
-    Directory(std::string dirPath) : m_dirPath(std::move(dirPath))
-    {
-        if (m_dirPath.empty())
-        {
-            LOGF("dirPath provided is empty");
-        }
-        if (m_dirPath.back() != '/') m_dirPath.push_back('/');
-    }
-    std::string_view path() const noexcept { return m_dirPath; }
+    explicit Directory(std::filesystem::path path) : m_path(std::move(path)) {}
+    std::filesystem::path path() && { return std::move(m_path); }
+    const std::filesystem::path &path() const & { return m_path; }
 
-    std::string make(std::string suffix) const { return m_dirPath + std::move(suffix); }
+    Directory subdir(std::string_view rel) const { return Directory{m_path / rel}; }
+    File file(std::string_view rel) const { return File{m_path / rel}; }
 };
+
+namespace detail
+{
+// TODO: unit tests for this
+inline std::filesystem::path rel_path(std::string_view path, std::source_location location)
+{
+    namespace fs = std::filesystem;
+    fs::path absFilePath = fs::absolute(fs::path(location.file_name()));
+    return std::move(absFilePath).parent_path() / path;
+}
+} // namespace detail
+
+// Resolve a path relative to the directory of the file that calls this function
+// (through std::source_location).
+inline File rel_file(std::string relPath,
+                     std::source_location loc = std::source_location::current())
+{
+    return File{detail::rel_path(relPath, loc)};
+}
+
+inline Directory rel_dir(std::string relPath,
+                         std::source_location loc = std::source_location::current())
+{
+    return Directory{detail::rel_path(relPath, loc)};
+}
+
 } // namespace zimm

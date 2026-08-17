@@ -9,7 +9,7 @@ using namespace zimm;
 inline auto define_myapp(StaticLibrary *core, StaticLibrary *math, SharedLibrary *network)
 {
     auto app = make_executable("myapp");
-    app->add_source(rel_path("main.cpp"));
+    app->add_source(rel_file("main.cpp"));
     app->link_with(private_, {core, math, network});
     return app;
 }

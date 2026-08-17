@@ -18,12 +18,11 @@ int main()
 
     setup_my_lib();
 
-    auto myLibTpt =
-        ThirdPartyTarget::make("my_lib", FindPackageTptStrategy{rel_path("my_install")});
+    auto myLibTpt = ThirdPartyTarget::make("my_lib", FindPackageTptStrategy{rel_dir("my_install")});
     auto myLib = myLibTpt->assume_static_library("my_lib", "lib/my_lib.a");
-    myLib->add_public_property(IncludeProperty{rel_path("my_install/my_lib/include")});
+    myLib->add_public_property(IncludeProperty{rel_dir("my_install/my_lib/include")});
 
-    Directory gtestDir{std::string{prj.build_dir()} + "/googletest"};
+    Directory gtestDir = prj.build_dir().subdir("googletest");
     auto gtestTpt = ThirdPartyTarget::make(
         "googletest",
         FetchContentTptStrategy{
@@ -32,12 +31,10 @@ int main()
             MetaBuildCmd{"cmake -S . -B build"}, BuildCmd{"cmake --build build"}});
 
     auto gtestLib = gtestTpt->assume_static_library("gtest", "build/lib/libgtest.a");
-    gtestTpt->add_public_property(
-        IncludeProperty{std::string{gtestDir.path()} + "googletest/include"});
-    gtestTpt->add_public_property(
-        IncludeProperty{std::string{gtestDir.path()} + "googlemock/include"});
+    gtestTpt->add_public_property(IncludeProperty{gtestDir.subdir("googletest/include")});
+    gtestTpt->add_public_property(IncludeProperty{gtestDir.subdir("googlemock/include")});
 
-    Directory httplibDir{std::string{prj.build_dir()} + "/cpp-httplib"};
+    Directory httplibDir = prj.build_dir().subdir("cpp-httplib");
     std::string httplibFetch =
         git_fetch(httplibDir, "https://github.com/yhirose/cpp-httplib.git", "tag v0.52.0");
     auto httpLibTpt = ThirdPartyTarget::make(
@@ -45,10 +42,10 @@ int main()
         FetchContentTptStrategy{httplibDir, httplibFetch, MetaBuildCmd{""}, BuildCmd{""}});
     // auto httpLib = httplibTpt->assume_static_library("httplib", "httplib");
     // TODO: add header only library, or atleast assume_header_only_target
-    httpLibTpt->add_public_property(IncludeProperty{std::string{httplibDir.path()}});
+    httpLibTpt->add_public_property(IncludeProperty{httplibDir});
 
     auto app = make_executable("tpt_demo");
-    app->add_source(rel_path("main.cpp"));
+    app->add_source(rel_file("main.cpp"));
     app->link_with(private_, myLib);
     app->link_with(private_, gtestLib);
     add_dependency_rel(app, httpLibTpt);
@@ -61,14 +58,14 @@ int main()
 
 void setup_my_lib()
 {
-    fs::path libPath = rel_path("my_install/my_lib/lib/");
-    fs::path incPath = rel_path("my_install/my_lib/include/");
-    fs::create_directories(libPath.c_str());
-    fs::create_directories(incPath.c_str());
+    Directory libDir = rel_dir("my_install/my_lib/lib");
+    Directory incDir = rel_dir("my_install/my_lib/include");
+    Directory tmpDir = rel_dir("tmp");
+    fs::create_directories(libDir.path());
+    fs::create_directories(incDir.path());
+    fs::create_directories(tmpDir.path());
 
-    fs::create_directories("tmp");
-
-    std::ofstream srcOfs{"tmp/my_lib.cpp"};
+    std::ofstream srcOfs{tmpDir.file("my_lib.cpp").path()};
     // clang-format off
     static constexpr auto SRC =
         "#include \"my_lib.hpp\"\n"
@@ -76,13 +73,21 @@ void setup_my_lib()
     // clang-format on
     srcOfs << SRC << std::endl;
 
-    std::ofstream hdrOfs{"tmp/my_lib.hpp"};
+    std::ofstream hdrOfs{tmpDir.file("my_lib.hpp").path()};
     static constexpr auto HDR = "void my_lib_func(void);";
     hdrOfs << HDR << std::endl;
 
-    std::system("g++ tmp/my_lib.cpp -c -o tmp/my_lib.o");
-    std::system(std::format("ar rcs {} tmp/my_lib.o", (libPath / "my_lib.a").c_str()).c_str());
-    std::system(std::format("cp tmp/my_lib.hpp {}", (incPath / "my_lib.hpp").c_str()).c_str());
+    auto myLibO = tmpDir.file("my_lib.o");
+    auto myLibCpp = tmpDir.file("my_lib.cpp");
+    auto myLibHpp = tmpDir.file("my_lib.hpp");
+    std::system(
+        std::format("g++ {} -c -o {}", myLibCpp.path().string(), myLibO.path().string()).c_str());
+    std::system(
+        std::format("ar rcs {} {}", libDir.file("my_lib.a").path().string(), myLibO.path().string())
+            .c_str());
+    std::system(
+        std::format("cp {} {}", myLibHpp.path().string(), incDir.file("my_lib.hpp").path().string())
+            .c_str());
 
-    fs::remove_all("tmp");
+    fs::remove_all(tmpDir.path());
 }

@@ -21,14 +21,15 @@ int main()
     Project prj{"Custom Target Example", std::move(cfg.value())};
 
     // --- Custom target: run adder.py to generate adder.h + adder.cpp ---
-    auto gen = make_custom_target<AdderGen>("adder", Directory{std::string{prj.build_dir()}});
-    gen->add_input(rel_path("adder.py"));
-    gen->add_outputs({gen->dir().make("adder.h"), gen->dir().make("adder.cpp")});
-    gen->add_property(public_, IncludeProperty{std::string{gen->dir().path()}});
+    auto gen = make_custom_target<AdderGen>("adder", prj.build_dir());
+    gen->add_input(rel_file("adder.py").path().string());
+    gen->add_outputs(
+        {gen->dir().file("adder.h").path().string(), gen->dir().file("adder.cpp").path().string()});
+    gen->add_property(public_, IncludeProperty{gen->dir()});
 
     // --- Executable ---
     auto app = make_executable("a");
-    app->add_sources({rel_path("a.cpp"), gen->dir().make("adder.cpp")});
+    app->add_sources({rel_file("a.cpp"), gen->dir().file("adder.cpp")});
     add_dependency_rel(app, gen);
 
     prj.register_top_level_target(app);

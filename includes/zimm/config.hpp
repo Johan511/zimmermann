@@ -1,6 +1,6 @@
 #pragma once
 
-#include <filesystem>
+#include "path.hpp"
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -14,9 +14,9 @@ struct Config
     std::string cxx_flags{}; // Inject C++ flags
 
     // TODO: this seems janky, install/build should be wrt project root, figure out how to manage it
-    std::string build_dir{};
-    std::string install_dir{};
-    std::string compile_commands_path{};
+    Directory build_dir{""};
+    Directory install_dir{""};
+    File compile_commands_path{""};
 
     std::string flags_debug{};          // flags for debug build
     std::string flags_release{};        // flags for release build

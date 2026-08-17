@@ -8,7 +8,7 @@ int main()
     Project prj{"Feature Detection", std::move(cfg.value())};
 
     auto app = make_executable("feature_detect");
-    app->add_source(rel_path("main.cpp"));
+    app->add_source(rel_file("main.cpp"));
 
     // --- header checks ---
 

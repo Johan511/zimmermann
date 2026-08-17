@@ -1,6 +1,7 @@
 #pragma once
 
 #include "definitions.hpp"
+#include "path.hpp"
 
 #include <string>
 #include <type_traits>
@@ -38,11 +39,11 @@ public:
 
 class IncludeProperty : public Property
 {
-    std::string m_includePath;
+    Directory m_includePath;
 
 public:
-    explicit IncludeProperty(std::string_view includePath);
-    std::string_view include_path() const noexcept { return m_includePath; }
+    explicit IncludeProperty(Directory includePath);
+    const Directory &include_path() const noexcept { return m_includePath; }
     std::unique_ptr<Property> clone() const override
     {
         return std::make_unique<IncludeProperty>(*this);

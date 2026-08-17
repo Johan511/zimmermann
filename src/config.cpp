@@ -89,8 +89,8 @@ try
     Config cfg;
 
     // Set defaults
-    cfg.build_dir = fs::current_path().string() + "/";
-    cfg.install_dir = (fs::current_path().parent_path() / "install").string() + "/";
+    cfg.build_dir = Directory{fs::current_path()};
+    cfg.install_dir = Directory{fs::current_path().parent_path() / "install"};
     cfg.flags_debug = "-g";
     cfg.flags_release = "-O3 -DNDEBUG";
     cfg.flags_relwithdebinfo = "-O3 -g -DNDEBUG";
@@ -111,7 +111,16 @@ try
             if (memberName != key) continue;
 
             if constexpr (is_append_field(member)) cfg.[:member:] += value;
-            else if constexpr (member != ^^Config::misc) cfg.[:member:] = value;
+            else if constexpr (member != ^^Config::misc)
+            {
+                if constexpr (std::is_same_v<std::remove_cvref_t<decltype(cfg.[:member:])>,
+                                             Directory>)
+                    cfg.[:member:] = Directory{std::string{value}};
+                else if constexpr (std::is_same_v<std::remove_cvref_t<decltype(cfg.[:member:])>,
+                                                  File>)
+                    cfg.[:member:] = File{std::string{value}};
+                else cfg.[:member:] = value;
+            }
             else LOGF("Invalid key: misc is being ignored");
 
             matched = true;
@@ -122,8 +131,8 @@ try
 
     // make sure the ordering of these depenedent defaults is correct
     // dependent defaults (defaults which depend on other variables)
-    if (cfg.compile_commands_path.empty())
-        cfg.compile_commands_path = fs::path{cfg.build_dir} / "compile_commands.json";
+    if (cfg.compile_commands_path.path().empty())
+        cfg.compile_commands_path = cfg.build_dir.file("compile_commands.json");
 
     return cfg;
 }

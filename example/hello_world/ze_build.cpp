@@ -9,13 +9,13 @@ int main()
     prj.add_global_property(CompileFlagProperty{"-std=c++23"});
 
     auto helloWorld = make_executable("HelloWorld");
-    helloWorld->add_property(public_, IncludeProperty{rel_path("include")});
-    helloWorld->add_source(rel_path("hello_world.cpp"));
+    helloWorld->add_property(public_, IncludeProperty{rel_dir("include")});
+    helloWorld->add_source(rel_file("hello_world.cpp"));
 
     prj.register_top_level_target(helloWorld);
 
     prj.installer().install_binary(helloWorld);
-    prj.installer().install_headers(Directory{rel_path("include")});
+    prj.installer().install("include", rel_dir("include"));
 
     Tester &tester = prj.tester();
     tester.add_test(helloWorld);

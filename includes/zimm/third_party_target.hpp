@@ -59,18 +59,17 @@ public:
 
     std::string_view meta_build_cmd() const noexcept { return m_metaBuildCmd; }
     std::string_view build_cmd() const noexcept { return m_buildCmd; }
-    std::string_view dir() const noexcept { return m_dir.path(); }
+    const Directory &dir() const noexcept { return m_dir; }
 };
 
 class FindPackageTptStrategy
 {
-    static std::vector<std::string> defaultPaths;
-
-    std::vector<std::string> m_searchPaths;
+    static std::vector<Directory> defaultPaths;
+    std::vector<Directory> m_searchDirs;
 
 public:
-    FindPackageTptStrategy(std::string searchPath);
-    FindPackageTptStrategy(std::vector<std::string> searchPaths);
+    FindPackageTptStrategy(Directory searchPath);
+    FindPackageTptStrategy(std::vector<Directory> searchPaths);
     FindPackageTptStrategy();
     ThirdPartyTarget *attempt(std::string_view name) const;
 };
@@ -97,7 +96,7 @@ inline std::string git_fetch(const Directory &dir, std::string_view url, std::st
                        "git remote add origin {1} && "
                        "git fetch origin {2} && "
                        "git checkout FETCH_HEAD",
-                       dir.path(), url, id);
+                       dir.path().string(), url, id);
 }
 
 } // namespace zimm

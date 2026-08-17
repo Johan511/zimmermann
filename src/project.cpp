@@ -17,11 +17,10 @@ namespace zimm
 {
 Project::Project(std::string name, Config config, std::source_location mainFile)
     : m_name(std::move(name)), m_config(std::move(config)),
-      m_featureDetectionDir(m_config.build_dir), m_installer(m_config.build_dir),
-      m_mainFilePath(mainFile.file_name())
+      m_featureDetectionDir(m_config.build_dir), m_mainFilePath(mainFile.file_name())
 {
-    fs::create_directories(m_config.build_dir);
-    fs::create_directories(fs::path{m_featureDetectionDir.path()});
+    fs::create_directories(m_config.build_dir.path());
+    fs::create_directories(m_featureDetectionDir.path());
 
     // clang-format off
     if (m_config.build_type == "debug")
@@ -68,9 +67,6 @@ std::unordered_set<Target *> Project::seach_all_targets() const
 //  Feature detection
 bool Project::try_compile(std::string source, bool link)
 {
-    namespace fs = fs;
-    auto work_dir = fs::path{m_featureDetectionDir.path()};
-
     std::set<std::string> includes;
     std::set<std::string> compile_flags;
     std::set<std::string> link_flags;
@@ -81,7 +77,8 @@ bool Project::try_compile(std::string source, bool link)
         switch (prop.type())
         {
         case PropertyType::Include:
-            includes.insert(std::string{static_cast<const IncludeProperty &>(prop).include_path()});
+            includes.insert(
+                static_cast<const IncludeProperty &>(prop).include_path().path().string());
             break;
         case PropertyType::CompileFlag:
             compile_flags.insert(
@@ -102,22 +99,25 @@ bool Project::try_compile(std::string source, bool link)
     // --- write source file ---
 
     constexpr auto name = "zimm_check";
-    auto src_path = work_dir / std::format("{}.cpp", name);
+    auto src_file = m_featureDetectionDir.file(std::format("{}.cpp", name));
     {
-        std::ofstream src_file(src_path);
-        if (!src_file) return false;
-        src_file << source;
+        std::ofstream src_ofs(src_file.path());
+        if (!src_ofs) return false;
+        src_ofs << source;
     }
 
     // --- compile ---
 
-    auto obj_path = work_dir / std::format("{}.o", name);
-    auto err_path = work_dir / std::format("{}.err", name);
+    auto obj_file = m_featureDetectionDir.file(std::format("{}.o", name));
+    auto err_file = m_featureDetectionDir.file(std::format("{}.err", name));
+
+    const auto objStr = obj_file.path().string();
+    const auto errStr = err_file.path().string();
 
     std::string compiler = m_config.toolchain_prefix + "g++";
 
-    auto compile_cmd = std::format("{} {} -c {} -o {} 2>{}", compiler, cxxflags, src_path.string(),
-                                   obj_path.string(), err_path.string());
+    auto compile_cmd = std::format("{} {} -c {} -o {} 2>{}", compiler, cxxflags,
+                                   src_file.path().string(), objStr, errStr);
 
     if (std::system(compile_cmd.c_str()) != 0) return false;
 
@@ -126,9 +126,10 @@ bool Project::try_compile(std::string source, bool link)
         std::string ldflags;
         for (auto &f : link_flags) ldflags += " " + f;
 
-        auto bin_path = work_dir / name;
-        auto link_cmd = std::format("{} {} {} -o {} 2>>{}", compiler, obj_path.string(), ldflags,
-                                    bin_path.string(), err_path.string());
+        auto bin_file = m_featureDetectionDir.file(name);
+        const auto binStr = bin_file.path().string();
+        auto link_cmd =
+            std::format("{} {} {} -o {} 2>>{}", compiler, objStr, ldflags, binStr, errStr);
 
         if (std::system(link_cmd.c_str()) != 0) return false;
     }
@@ -138,26 +139,25 @@ bool Project::try_compile(std::string source, bool link)
 
 std::optional<std::string> Project::try_run(std::string source)
 {
-    namespace fs = fs;
-
     if (!try_compile(std::move(source), /*link=*/true)) return std::nullopt;
 
-    auto work_dir = fs::path{m_featureDetectionDir.path()};
     constexpr auto name = "zimm_check";
 
-    auto bin_path = work_dir / name;
-    auto out_path = work_dir / std::format("{}.out", name);
-    auto err_path = work_dir / std::format("{}.err", name);
+    auto bin_file = m_featureDetectionDir.file(name);
+    auto out_file = m_featureDetectionDir.file(std::format("{}.out", name));
+    auto err_file = m_featureDetectionDir.file(std::format("{}.err", name));
 
-    auto run_cmd =
-        std::format("{} > {} 2>>{}", bin_path.string(), out_path.string(), err_path.string());
+    const auto binStr = bin_file.path().string();
+    const auto errStr = err_file.path().string();
+
+    auto run_cmd = std::format("{} > {} 2>>{}", binStr, out_file.path().string(), errStr);
 
     if (std::system(run_cmd.c_str()) != 0) return std::nullopt;
 
-    std::ifstream out_file(out_path);
-    if (!out_file) return std::nullopt;
+    std::ifstream out_ofs(out_file.path());
+    if (!out_ofs) return std::nullopt;
 
-    std::string result(std::istreambuf_iterator<char>{out_file}, std::istreambuf_iterator<char>{});
+    std::string result(std::istreambuf_iterator<char>{out_ofs}, std::istreambuf_iterator<char>{});
     return result;
 }
 

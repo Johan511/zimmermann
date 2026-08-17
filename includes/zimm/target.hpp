@@ -2,6 +2,7 @@
 
 #include "definitions.hpp"
 #include "detail/utils.hpp"
+#include "logger.hpp"
 #include "path.hpp"
 #include "properties.hpp"
 
@@ -31,27 +32,28 @@ namespace detail
 class AssumedTrait
 {
     friend class zimm::ThirdPartyTarget;
-    std::string m_assumedPath;
+    File m_assumedPath{""};
 
 public:
-    std::string_view assumed_path() const noexcept { return m_assumedPath; }
+    const File &assumed_path() const noexcept { return m_assumedPath; }
 };
 
 class SourcesTrait
 {
-    std::vector<std::string> m_sources;
+    std::vector<File> m_sources;
 
 public:
-    void add_source(std::string source)
+    void add_source(File source)
     {
-        if (!utils::is_valid_source(source)) LOGF("invalid source = " << std::quoted(source));
+        if (!utils::is_valid_source(source.path()))
+            LOGF("invalid source = " << std::quoted(source.path().string()));
         m_sources.push_back(std::move(source));
     }
-    void add_sources(std::initializer_list<std::string> sources)
+    void add_sources(std::initializer_list<File> sources)
     {
         for (const auto &source : sources) add_source(source);
     }
-    std::span<const std::string> sources() const noexcept { return m_sources; }
+    std::span<const File> sources() const noexcept { return m_sources; }
 
     void link_with(const PublicTag *, Library *linkLib);
     void link_with(const PrivateTag *, Library *linkLib);
@@ -176,12 +178,12 @@ public:
     {
     }
 
+    // inputs/outputs are arbitrary strings, they need not be paths
     void add_input(std::string input) { m_inputs.push_back(std::move(input)); }
     void add_inputs(std::initializer_list<std::string> inputs)
     {
         for (const auto &input : inputs) add_input(input);
     }
-    // TODO: fix the paths
     void add_output(std::string output) { m_outputs.push_back(std::move(output)); }
     void add_outputs(std::initializer_list<std::string> outputs)
     {
