@@ -1,60 +1,22 @@
 #include "../includes/zimm/config.hpp"
+#include "args_parsers.hpp"
 #include "zimm/logger.hpp"
 #include <format>
-#include <iomanip>
 #include <meta>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <string_view>
+#include <type_traits>
+#include <vector>
 
 namespace meta = std::meta;
 namespace fs = std::filesystem;
 
+static constexpr size_t MAX_CONFIG_FILE_DEPTH = 10;
+
 namespace zimm
 {
-namespace
-{
-struct ArgsParser
-{
-    int argc;
-    char **argv;
-
-    ArgsParser(int argc, char *argv[]) : argc(argc), argv(argv) {}
-
-    struct iterator
-    {
-        using value_type = std::pair<std::string_view, std::string_view>;
-
-        const ArgsParser &m_args;
-        int m_pos{0};
-        value_type m_current;
-
-        void next()
-        {
-            if (++m_pos >= m_args.argc) return;
-
-            std::string_view arg(m_args.argv[m_pos]);
-            if (auto eq = arg.find('='); eq != std::string_view::npos)
-                m_current = {arg.substr(0, eq), arg.substr(eq + 1)};
-            // TODO: fix `throw;` with something more meaningful like `throw
-            // std::invalid_argument(...)`
-            else throw;
-        }
-
-    public:
-        iterator(const ArgsParser &args) : m_args(args) { next(); }
-        const value_type &operator*() const { return m_current; }
-        iterator &operator++()
-        {
-            next();
-            return *this;
-        }
-        bool operator==(std::default_sentinel_t) const { return m_pos >= m_args.argc; }
-    };
-
-    iterator begin() const { return iterator(*this); }
-    std::default_sentinel_t end() const { return {}; }
-};
 
 std::string_view resolve_host_os()
 {
@@ -73,7 +35,6 @@ std::string_view resolve_host_hardware()
     return CMAKE_HOST_HARDWARE;
 #endif
 }
-} // namespace
 
 consteval bool is_append_field(meta::info info)
 {
@@ -81,6 +42,47 @@ consteval bool is_append_field(meta::info info)
     for (const auto field : appendFieldsList)
         if (info == field) return true;
     return false;
+}
+
+void apply_arg(Config &cfg, std::string key, std::string value)
+{
+    bool matched = false;
+    template for (constexpr auto member : std::define_static_array(
+                      meta::nonstatic_data_members_of(^^Config, meta::access_context::current())))
+    {
+        constexpr auto memberName = meta::identifier_of(member);
+        if (memberName != key) continue;
+
+        if constexpr (is_append_field(member))
+        {
+            cfg.[:member:] += std::move(value);
+            matched = true;
+        }
+        else if constexpr (member != ^^Config::misc)
+        {
+            cfg.[:member:] = typename[:meta::type_of(member):]{std::move(value)};
+            matched = true;
+        }
+        else LOGE("Invalid key: misc is being ignored");
+    }
+
+    if (!matched) cfg.misc[std::string{key}] = value;
+}
+
+void apply_args(Config &cfg, std::ranges::range auto keysAndValues, int depth)
+{
+    static_assert(std::is_same_v<std::ranges::range_value_t<decltype(keysAndValues)>,
+                                 std::pair<std::string, std::string>>);
+    if (depth >= MAX_CONFIG_FILE_DEPTH)
+        throw std::runtime_error(std::format("TODO: please write error"));
+
+    for (auto &&[key, value] : std::move(keysAndValues))
+    {
+        if (key == "args_xml") apply_args(cfg, parse_xml_args(value), depth + 1);
+        else if (key == "args_yaml" || key == "args_yml")
+            apply_args(cfg, parse_yaml_args(value), depth + 1);
+        else apply_arg(cfg, std::move(key), std::move(value));
+    }
 }
 
 std::optional<Config> make_config(int argc, char *argv[])
@@ -99,26 +101,7 @@ try
     cfg.os = resolve_host_os();
     cfg.hardware = resolve_host_hardware();
 
-    for (const auto &[key, value] : ArgsParser(argc, argv))
-    {
-        bool matched = false;
-
-        template for (constexpr auto member :
-                      std::define_static_array(meta::nonstatic_data_members_of(
-                          ^^decltype(cfg), meta::access_context::current())))
-        {
-            constexpr std::string_view memberName = meta::identifier_of(member);
-            if (memberName != key) continue;
-
-            if constexpr (is_append_field(member)) cfg.[:member:] += value;
-            else if constexpr (member != ^^Config::misc) cfg.[:member:] = value;
-            else LOGF("Invalid key: misc is being ignored");
-
-            matched = true;
-        }
-
-        if (!matched) cfg.misc[std::string{key}] = value;
-    }
+    apply_args(cfg, parse_cli_args(argc, argv), 0);
 
     // make sure the ordering of these depenedent defaults is correct
     // dependent defaults (defaults which depend on other variables)

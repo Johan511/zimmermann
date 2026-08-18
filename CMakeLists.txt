@@ -17,6 +17,22 @@ add_library(zimmermann STATIC
     src/third_party_target.cpp
 )
 target_compile_options(zimmermann PRIVATE "-freflection")
+
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_INSTALL OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_FORMAT_SOURCE OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_USE_STRICT_FLAGS OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/yaml-cpp EXCLUDE_FROM_ALL)
+
+set(PUGIXML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(PUGIXML_BUILD_SHARED_AND_STATIC_LIBS OFF CACHE BOOL "" FORCE)
+set(PUGIXML_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/pugixml EXCLUDE_FROM_ALL)
+
+add_dependencies(zimmermann yaml-cpp pugixml-static)
+target_link_libraries(zimmermann PRIVATE yaml-cpp pugixml-static)
 target_compile_definitions(zimmermann PRIVATE
     ZIMM_BUILDING_LIB
     CMAKE_HOST_OS="${CMAKE_HOST_SYSTEM_NAME}"
