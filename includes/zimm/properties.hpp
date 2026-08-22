@@ -22,6 +22,7 @@ enum class PropertyType
     CompileFlag,
     LinkFlag,
     LinkTarget,
+    PrecompiledHeader,
 };
 
 class Property
@@ -92,6 +93,25 @@ public:
     std::unique_ptr<Property> clone() const override
     {
         return std::make_unique<LinkTargetProperty>(*this);
+    }
+};
+
+// Marks a header to be precompiled and used by the owning target.
+//
+// PCH is modelled as a property so it flows through the same property system as
+// includes/flags and stays generator-agnostic: a generator is free to translate
+// it however its native build system expresses precompiled headers (ninja: a
+// dedicated compile edge + -include; make: .gch rules; Xcode: GCC_PREFIX_HEADER).
+class PrecompiledHeaderProperty : public Property
+{
+    File m_header;
+
+public:
+    explicit PrecompiledHeaderProperty(File header);
+    const File &header() const noexcept { return m_header; }
+    std::unique_ptr<Property> clone() const override
+    {
+        return std::make_unique<PrecompiledHeaderProperty>(*this);
     }
 };
 

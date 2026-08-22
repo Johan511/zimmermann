@@ -1,3 +1,9 @@
 build*/
 install*/
 _zimm_workspace/
+
+# PCH artifacts written next to source headers
+*.gch
+
+# C++20 module BMI cache (build-local, but guard against stray roots)
+gcm.cache/

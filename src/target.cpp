@@ -32,6 +32,9 @@ void Target::add_property_impl(std::vector<PropertyObject> &properties, Property
         case PropertyType::LinkTarget:
             return static_cast<const LinkTargetProperty &>(a).link_lib() ==
                    static_cast<const LinkTargetProperty &>(b).link_lib();
+        case PropertyType::PrecompiledHeader:
+            return static_cast<const PrecompiledHeaderProperty &>(a).header().path() ==
+                   static_cast<const PrecompiledHeaderProperty &>(b).header().path();
         }
         return false;
     };

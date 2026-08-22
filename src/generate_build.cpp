@@ -14,6 +14,9 @@ __attribute__((weak)) Directory zimm_dir();
 
 namespace
 {
+// forward decls to allow free ordering of helpers below
+std::string ninja_target_name(const File &file);
+
 const File &get_assumed_path(const Target &target)
 {
     return static_cast<const detail::AssumedTrait &>(target).assumed_path();
@@ -82,6 +85,104 @@ std::string get_link_sources(std::span<const PropertyObject> props)
         oss << ninja_target_name(*static_cast<const LinkTargetProperty &>(*prop).link_lib()) << " ";
     }
     return std::move(oss).str();
+}
+
+// Returns the precompiled header file for a target if one is set, else nullptr.
+const File *get_precompiled_header(std::span<const PropertyObject> props)
+{
+    const File *result = nullptr;
+    for (const auto &prop : props)
+    {
+        if (prop->type() == PropertyType::PrecompiledHeader)
+            result = &static_cast<const PrecompiledHeaderProperty &>(*prop).header();
+    }
+    return result;
+}
+
+// Ninja output name for a precompiled-header artifact.
+//
+// GCC resolves a precompiled header for `#include`/`-include <h>` by looking for
+// `<h>.gch` *adjacent to* the header file itself (it does not search include
+// paths for the .gch, and for an absolute `-include` it looks next to that
+// absolute header). So the .gch must be written next to the header. This
+// mirrors what CMake's native PCH support and `cotire` do.
+std::string pch_ninja_name(const File &header, const Directory & /*buildDir*/)
+{
+    return header.path().string() + ".gch";
+}
+
+// Collected view of a module interface unit for the generator.
+struct ModuleInfo
+{
+    const Target *owner;
+    const File *source;
+    std::string name;
+    std::vector<std::string> imports;
+    std::string bmiName;   // build-dir path of the compiled module interface
+    std::string objName;   // object file produced alongside the BMI
+};
+
+// BMI path for a module: build_dir/gcm.cache/<name>.gcm, matching GCC's default
+// gcm.cache layout so auto-discovery also works when no mapper is used.
+std::string module_bmi_name(std::string_view moduleName, const Directory &buildDir)
+{
+    return (buildDir.path() / "gcm.cache" / moduleName).string() + ".gcm";
+}
+
+// Object output for a module unit: same mangling as ordinary sources.
+//
+// The suffix is `.mo` (module object) rather than `.mod` — GCC's driver treats
+// `.mod` as a Modula-2 source and tries to invoke the (often absent) `cc1gm2`
+// at link time. `.mo` avoids that collision while staying distinct from the
+// plain `.o` produced for ordinary translation units.
+std::string module_obj_name(const File &source)
+{
+    return ninja_target_name(source) + ".mo";
+}
+
+// Topologically sort module units so that a module is built before any unit that
+// imports it. Returns nullptr-safe ordering; cycles are a hard error.
+std::vector<const ModuleInfo *>
+sort_module_units(const std::vector<ModuleInfo> &units)
+{
+    std::unordered_map<std::string, const ModuleInfo *> byName;
+    for (const auto &u : units) byName[u.name] = &u;
+
+    // inDegree[name] = number of imported modules (that we build) not yet emitted
+    std::unordered_map<std::string, size_t> inDegree;
+    // reverse adjacency: for each module m, which modules import m
+    std::unordered_map<std::string, std::vector<std::string>> importers;
+
+    for (const auto &u : units)
+    {
+        size_t imp = 0;
+        for (const auto &m : u.imports)
+        {
+            if (!byName.contains(m)) continue; // external module, ignore
+            ++imp;
+            importers[m].push_back(u.name);
+        }
+        inDegree[u.name] = imp;
+    }
+
+    std::queue<std::string> ready;
+    for (const auto &u : units)
+        if (inDegree[u.name] == 0) ready.push(u.name);
+
+    std::vector<const ModuleInfo *> order;
+    while (!ready.empty())
+    {
+        std::string cur = ready.front();
+        ready.pop();
+        order.push_back(byName[cur]);
+        auto it = importers.find(cur);
+        if (it == importers.end()) continue;
+        for (const auto &dependent : it->second)
+            if (--inDegree[dependent] == 0) ready.push(dependent);
+    }
+
+    if (order.size() != units.size()) LOGF("module dependency cycle detected");
+    return order;
 }
 
 std::string ninja_target_name(const File &file /* cxx or c file */)
@@ -191,6 +292,31 @@ void generate_build(Project &project)
     out << "  deps = gcc\n";
     out << "  description = CC $out\n\n";
 
+    // Precompiled header: compile a header (-x c++-header) to a .gch artifact.
+    out << "rule pch\n";
+    out << "  command = " << gxx << " -MD -MT $out -MF $out.d -x c++-header -c $in -o $out $flags\n";
+    out << "  depfile = $out.d\n";
+    out << "  deps = gcc\n";
+    out << "  description = PCH $out\n\n";
+
+    // C++20 module interface unit → compiled module interface (BMI) + object.
+    // GCC, given -fmodules-ts and no explicit -fmodule-mapper, writes the BMI
+    // to gcm.cache/<name>.gcm relative to the working directory. Ninja runs
+    // every command in the build dir, so gcm.cache/ lives there uniformly and
+    // importers auto-discover their dependencies. The object ($obj) is the -o
+    // target.
+    //
+    // We deliberately do NOT use ninja's deps=gcc/depfile machinery here:
+    // GCC's module depfile emits extra edges (e.g. `bmi:| obj`) that make the
+    // object both an output and an order-only input of the BMI, which ninja
+    // rejects as "inputs may not also have inputs". Module-to-module ordering
+    // is handled explicitly via order-only deps on imported modules' objects.
+    out << "rule cxx_module\n";
+    out << "  command = " << gxx
+        << " -fmodules-ts"
+        << " -c $in -o $obj $flags\n";
+    out << "  description = MOD $obj\n\n";
+
     out << "rule ar\n";
     out << "  command = " << ar << " rcs $out $in\n";
     out << "  description = AR $out\n\n";
@@ -221,6 +347,93 @@ void generate_build(Project &project)
 
     genCc.add_entry(std::move(zeBuildCppDir), zeBuildCpp, std::move(compileCmdGuess));
 
+    // --- C++20 modules: collect all module interface units across targets,
+    //     topologically sort them by imports, and emit one compile edge per unit
+    //     producing the object + BMI. GCC, given -fmodules-ts, writes the BMI to
+    //     gcm.cache/<name>.gcm relative to the working directory; ninja runs
+    //     every command in the build dir, so the cache lives there uniformly and
+    //     importers auto-discover their dependencies. Module-to-module ordering
+    //     is enforced with explicit order-only deps on imported modules' objects
+    //     (the BMI itself is only discovered via the producing edge's depfile, so
+    //     it can't be an order-only input on a clean first build — see objFor).
+    std::vector<ModuleInfo> modules;
+    for (const auto *targetPtr : topSortedTargets)
+    {
+        auto sourcesPtr = dynamic_cast<const detail::SourcesTrait *>(targetPtr);
+        if (!sourcesPtr) continue;
+        for (const auto &unit : sourcesPtr->module_units())
+        {
+            ModuleInfo info;
+            info.owner = targetPtr;
+            info.source = &unit.source;
+            info.name = unit.name;
+            info.imports = unit.imports;
+            info.bmiName = module_bmi_name(unit.name, project.build_dir());
+            info.objName = module_obj_name(unit.source);
+            modules.push_back(std::move(info));
+        }
+    }
+
+    Directory moduleCacheDir = project.build_dir().subdir("gcm.cache");
+    fs::create_directories(moduleCacheDir.path());
+
+    auto sortedModules = sort_module_units(modules);
+
+    // Map: module name → object output (for order-only deps between module
+    // edges). We depend on the *object* rather than the BMI because the BMI is
+    // only discovered via the producing edge's depfile, which ninja loads after
+    // that edge runs — so a depfile-discovered output can't be an order-only
+    // input on a first (clean) build. The object is a declared output, so it is
+    // always available for ordering, and producing it produces the BMI too.
+    auto objFor = [&](std::string_view name) -> const std::string *
+    {
+        for (const auto &m : modules)
+            if (m.name == name) return &m.objName;
+        return nullptr;
+    };
+
+    for (const auto *m : sortedModules)
+    {
+        const Target &owner = *m->owner;
+        std::string flags = globalCompileFlags;
+        flags += " " + get_compile_flags(owner.public_properties());
+        flags += " " + get_compile_flags(owner.private_properties());
+        flags += " " + config.cxx_flags;
+
+        // The object is the edge output. GCC's -MD depfile records the BMI
+        // (gcm.cache/<name>.gcm) as a produced output too, and ninja picks that
+        // up via deps=gcc — so the BMI becomes a known ninja output *without*
+        // us declaring it explicitly (declaring it would conflict with the
+        // depfile and trigger "inputs may not also have inputs").
+        out << "build " << m->objName << ": cxx_module "
+            << m->source->path().string();
+        // order-only: any imported modules' objects (so the imported BMI exists
+        // before this unit compiles).
+        if (!m->imports.empty())
+        {
+            out << " ||";
+            for (const auto &imp : m->imports)
+                if (auto *obj = objFor(imp)) out << " " << *obj;
+        }
+        out << "\n";
+        out << "  flags = " << flags << "\n";
+        out << "  obj = " << m->objName << "\n\n";
+
+        genCc.add_entry(project.build_dir(), *m->source,
+                        std::format("{} -fmodules-ts -c {} -o {} {}", gxx,
+                                    m->source->path().string(), m->objName, flags));
+    }
+
+    // A flag string every C++ consumer compile needs to participate in modules.
+    // (Empty when no modules exist, so module-free builds are unaffected.)
+    std::string moduleConsumerFlags;
+    std::vector<std::string> moduleObjNames; // for order-only deps
+    if (!modules.empty())
+    {
+        moduleConsumerFlags = "-fmodules-ts";
+        for (const auto &m : modules) moduleObjNames.push_back(m.objName);
+    }
+
     for (const auto *targetPtr : topSortedTargets)
     {
         const Target &target = *targetPtr;
@@ -243,10 +456,52 @@ void generate_build(Project &project)
         std::string localLinkFlags = get_link_flags(target.public_properties()) + " " +
                                      get_link_flags(target.private_properties());
 
+        // Precompiled header: emit one PCH build edge for the target and have
+        // every C++ source depend on it (order-only) so it is built first, then
+        // pass -include of the header so consumers pick up the .gch.
+        const File *pchHeader = get_precompiled_header(target.private_properties());
+        std::string pchName;
+        std::string pchIncludeFlag;
+        if (pchHeader)
+        {
+            pchName = pch_ninja_name(*pchHeader, project.build_dir());
+            fs::create_directories(fs::path{pchName}.parent_path());
+
+            std::string pchFlags = globalCompileFlags;
+            pchFlags += " " + localCompileFlags;
+            pchFlags += " " + config.cxx_flags;
+            // NOTE: the PCH is deliberately built *without* -fmodules-ts even when
+            // the target uses modules. GCC's module-aware PCH currently forces the
+            // link step to require the (Modula-2) `gm2` helper, which is not
+            // shipped with every GCC build. A non-module PCH is consumed fine by
+            // module-compiled sources and avoids the gm2 link dependency.
+
+            out << "build " << pchName << ": pch " << pchHeader->path().string();
+            if (!depList.empty()) out << " | " << depList;
+            out << "\n  flags = " << pchFlags << "\n\n";
+
+            // -include of the header path (without .gch) makes g++ look for the
+            // precompiled form automatically alongside it.
+            pchIncludeFlag = std::format("-include {}", pchHeader->path().string());
+
+            genCc.add_entry(project.build_dir(), *pchHeader,
+                            std::format("{} -x c++-header -c {} -o {} {}", gxx,
+                                        pchHeader->path().string(), pchName, pchFlags));
+        }
+
         std::string sourceObjectsNinjaNames;
         bool depsEnsured = false;
         if (auto sourcesPtr = dynamic_cast<const detail::SourcesTrait *>(targetPtr))
         {
+            // Module units owned by this target: their objects link in like
+            // ordinary sources, and they are already emitted as cxx_module edges.
+            for (const auto &unit : sourcesPtr->module_units())
+            {
+                std::string objName = module_obj_name(unit.source);
+                sourceObjectsNinjaNames += " " + objName;
+                depsEnsured = true;
+            }
+
             std::vector<std::string> objectNinjaNames;
             for (const File &src : sourcesPtr->sources())
             {
@@ -255,13 +510,31 @@ void generate_build(Project &project)
                 std::string_view rule = isCxx ? "cxx" : "cc";
                 std::string objectNinjaName = ninja_target_name(src);
                 const auto srcStr = src.path().string();
-                out << "build " << objectNinjaName << ": " << rule << " " << srcStr << " | "
-                    << depList << '\n';
+                out << "build " << objectNinjaName << ": " << rule << " " << srcStr;
+                if (!depList.empty()) out << " | " << depList;
+                // order-only deps: PCH (so it's built first) + all module BMIs
+                // (so an importing source compiles after the modules it may
+                // import exist). We don't prescan plain sources for imports, so
+                // we conservatively depend on every BMI.
+                std::vector<std::string> orderOnly;
+                if (pchHeader && isCxx) orderOnly.push_back(pchName);
+                if (!moduleConsumerFlags.empty() && isCxx)
+                {
+                    for (const auto &b : moduleObjNames) orderOnly.push_back(b);
+                }
+                if (!orderOnly.empty())
+                {
+                    out << " ||";
+                    for (const auto &o : orderOnly) out << " " << o;
+                }
+                out << '\n';
                 sourceObjectsNinjaNames += " " + objectNinjaName;
 
                 std::string flags = globalCompileFlags;
                 flags += " " + localCompileFlags;
                 flags += " " + (isCxx ? config.cxx_flags : config.c_flags);
+                if (pchHeader && isCxx) flags += " " + pchIncludeFlag;
+                if (!moduleConsumerFlags.empty() && isCxx) flags += " " + moduleConsumerFlags;
                 out << "  flags = " << flags << "\n\n";
 
                 genCc.add_entry(project.build_dir(), src,

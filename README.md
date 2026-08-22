@@ -36,6 +36,58 @@ Target and Property are closed-polymorphic sets of the following types
 - **IncludeProperty**: Used to include a certain directory to a certain target
 - **CompileFlagProperty**: Used to set extra compile flags to a certain target
 - **LinkFlagProperty**: Used to set extra link flags to a certain target
+- **PrecompiledHeaderProperty**: Marks a header as the precompiled header for a target (see [Precompiled Headers](#precompiled-headers))
+
+## Precompiled Headers
+
+Any target with sources can declare a precompiled header (PCH). The PCH is
+modelled as a property, so it flows through the same property system as includes
+and flags and stays generator-agnostic: each generator backend is free to
+translate it however its native build system expresses precompiled headers.
+
+```cpp
+auto app = make_executable("myapp");
+app->add_source(rel_file("main.cpp"));
+app->set_precompiled_header(rel_file("common.hpp"));
+```
+
+Every C++ source of the target is then compiled with `-include <header>` and an
+order-only dependency on the generated `.gch`, so the PCH is built before any
+source that consumes it. Note: GCC resolves a PCH for `-include <h>` by looking
+for `<h>.gch` *next to* `<h>`, so the `.gch` is written alongside the header
+(the same convention CMake's native PCH support uses).
+
+## C++20 Modules
+
+Module interface units are declared on a target via `add_module_unit`. A
+`ModuleUnit` carries the source file, the module name, and the list of module
+names it imports:
+
+```cpp
+auto app = make_executable("app");
+app->add_module_unit(ModuleUnit{rel_file("math.cppm"), "math", {}});
+app->add_module_unit(ModuleUnit{rel_file("extra.cppm"), "extra", {"math"}});
+app->add_source(rel_file("main.cpp"));
+```
+
+The generator collects all module units across all targets, topologically sorts
+them by their `imports` (an imported module's BMI is always built before the
+importer's), and emits one compile edge per module interface unit producing both
+the object and the BMI (`gcm.cache/<name>.gcm` for GCC). Importers are compiled
+with `-fmodules-ts` and ordered after the BMIs they may consume.
+
+### Portability limitation (important)
+
+C++20 modules require **source dependency scanning and BMI-based ordering** that
+not every build-system generator supports. Even CMake only provides C++20 module
+support with the **Ninja** generator — the Make and Xcode generators do not.
+Zimmermann's module emission is therefore **Ninja-only**. The *model*
+(`ModuleUnit`, `add_module_unit`) is generator-agnostic, so a future Make/Xcode
+backend could implement module support without changing user code, but today
+module targets require the Ninja backend.
+
+Module interface source extensions recognised: `.cppm`, `.ixx`, `.mpp`, `.cxxm`.
+
 
 ## Config
 

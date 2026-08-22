@@ -29,6 +29,27 @@ class ThirdPartyTarget;
 namespace detail
 {
 
+// A C++20 module interface unit, declared in a generator-agnostic way.
+//
+// `source`   — the module interface file (.cppm/.ixx/.mpp/.cxxm, or a .cpp
+//               authored as a module unit).
+// `name`     — the module name as written in `export module <name>` (without the
+//               `export module` prefix and without any partition `:part` for a
+//               primary interface; partitions include the colon).
+// `imports`  — module names this unit imports (transitively required to be built
+//               before this one).
+//
+// This describes only the module *model*. How a generator turns it into BMI
+// compile edges, ordering, and import flags is the generator's concern — the
+// Ninja generator does dependency scanning + BMI emission; Make and Xcode do not
+// support C++20 modules (see README).
+struct ModuleUnit
+{
+    File source;
+    std::string name;
+    std::vector<std::string> imports;
+};
+
 class AssumedTrait
 {
     friend class zimm::ThirdPartyTarget;
@@ -41,6 +62,7 @@ public:
 class SourcesTrait
 {
     std::vector<File> m_sources;
+    std::vector<ModuleUnit> m_moduleUnits;
 
 public:
     void add_source(File source)
@@ -54,6 +76,18 @@ public:
         for (const auto &source : sources) add_source(source);
     }
     std::span<const File> sources() const noexcept { return m_sources; }
+
+    // Declare a C++20 module interface unit owned by this target. `unit.imports`
+    // are the module names this unit imports; they drive build ordering in the
+    // generator (imported modules must be built first).
+    void add_module_unit(ModuleUnit unit)
+    {
+        if (!utils::is_module_source(unit.source.path()) &&
+            !utils::is_cxx_source(unit.source.path()))
+            LOGF("invalid module source = " << std::quoted(unit.source.path().string()));
+        m_moduleUnits.push_back(std::move(unit));
+    }
+    std::span<const ModuleUnit> module_units() const noexcept { return m_moduleUnits; }
 
     void link_with(const PublicTag *, Library *linkLib);
     void link_with(const PrivateTag *, Library *linkLib);
@@ -119,6 +153,13 @@ public:
     void add_private_property(PropertyObject property)
     {
         add_property_impl(m_privateProperties, std::move(property));
+    }
+
+    // Convenience: mark a header as the precompiled header for this target.
+    // Equivalent to add_private_property(PrecompiledHeaderProperty{header}).
+    void set_precompiled_header(File header)
+    {
+        add_property_impl(m_privateProperties, PrecompiledHeaderProperty{std::move(header)});
     }
 };
 
@@ -198,6 +239,9 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // FACTORIES
+
+// Convenience alias so users write `zimm::ModuleUnit` rather than `zimm::detail::ModuleUnit`.
+using detail::ModuleUnit;
 
 inline Executable *make_executable(std::string name) { return new Executable{std::move(name)}; }
 

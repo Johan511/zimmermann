@@ -17,4 +17,10 @@ static inline bool is_valid_source(const std::filesystem::path &path)
 {
     return is_c_source(path) || is_cxx_source(path);
 }
+// C++20 module interface unit source extensions.
+static inline bool is_module_source(const std::filesystem::path &path)
+{
+    auto ext = path.extension();
+    return ext == ".cppm" || ext == ".ixx" || ext == ".mpp" || ext == ".cxxm";
+}
 } // namespace zimm::utils

@@ -25,4 +25,9 @@ LinkTargetProperty::LinkTargetProperty(const Library *target)
     : Property(PropertyType::LinkTarget), m_linkLib(target)
 {
 }
+
+PrecompiledHeaderProperty::PrecompiledHeaderProperty(File header)
+    : Property(PropertyType::PrecompiledHeader), m_header(std::move(header))
+{
+}
 } // namespace zimm

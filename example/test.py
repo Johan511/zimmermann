@@ -65,6 +65,18 @@ EXAMPLES = [
         ],
     },
     {
+        "name": "modules_pch",
+        "binary": "bin/modules_pch",
+        "expected": [
+            "[modules_pch] module + pch example",
+            "result=122",
+        ],
+        "install": [
+            "bin/modules_pch",
+        ],
+        "skip_clangd": True,  # .cppm module units + -fmodules-ts confuse clangd
+    },
+    {
         "name": "ze_test",
         "binary": "bin/ze_test",
         "expected": ["Test runner example"],
@@ -281,7 +293,7 @@ def test_example(example: dict, perf: bool = False) -> bool:
             print(f"FAIL  {name}: ninja test failed")
             return False
 
-    if not check_clangd(test_dir, build_dir):
+    if not example.get("skip_clangd", False) and not check_clangd(test_dir, build_dir):
         print(f"FAIL {name}: clangd check failed")
         return False
 
