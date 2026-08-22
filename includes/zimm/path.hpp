@@ -1,44 +1,95 @@
 #pragma once
 
+#include "logger.hpp"
 #include <filesystem>
+#include <iomanip>
 #include <source_location>
 #include <string>
-#include <string_view>
 
 namespace zimm
 {
 
-class File
+namespace detail
+{
+class RelativePath
 {
     std::filesystem::path m_path;
 
 public:
+    RelativePath(auto &&p) : m_path(std::forward<decltype(p)>(p))
+    {
+        if (m_path.empty() || !m_path.is_relative())
+            LOGF("path=" << m_path << " is not a non-empty relative path");
+    }
+    const std::filesystem::path &path() const & noexcept { return m_path; }
+    std::filesystem::path path() && noexcept { return std::move(m_path); }
+};
+} // namespace detail
+
+class File
+{
+    std::filesystem::path m_path;
     explicit File(std::filesystem::path path) : m_path(std::move(path)) {}
+
+    friend class Directory;
+    friend File rel_file(std::string, std::source_location);
+
+public:
     std::filesystem::path path() && { return std::move(m_path); }
     const std::filesystem::path &path() const & { return m_path; }
+
+    static File make(std::string pathStr)
+    {
+        std::filesystem::path path{std::move(pathStr)};
+
+        if (path.empty()) LOGF("File can not be constructed from empty path = " << path);
+        path = std::filesystem::absolute(std::move(path));
+        return File{std::move(path)};
+    }
 };
 
 class Directory
 {
     std::filesystem::path m_path;
+    explicit Directory(std::filesystem::path path) : m_path(std::move(path)) {}
+
+    friend Directory rel_dir(std::string, std::source_location);
 
 public:
-    explicit Directory(std::filesystem::path path) : m_path(std::move(path)) {}
     std::filesystem::path path() && { return std::move(m_path); }
     const std::filesystem::path &path() const & { return m_path; }
 
-    Directory subdir(std::string_view rel) const { return Directory{m_path / rel}; }
-    File file(std::string_view rel) const { return File{m_path / rel}; }
+    Directory subdir(detail::RelativePath rel) const { return Directory{m_path / rel.path()}; }
+    File file(detail::RelativePath rel) const { return File{m_path / rel.path()}; }
+
+    std::string dir_name() const
+    {
+        return m_path.has_filename() ? m_path.filename().string()
+                                     : m_path.parent_path().filename().string();
+    }
+
+    static Directory make(std::string pathStr)
+    {
+        if (pathStr.empty())
+            LOGF("Directory can not be constructed from empty path = " << std::quoted(pathStr));
+
+        auto path = std::filesystem::absolute(std::move(pathStr));
+        return Directory{std::move(path)};
+    }
 };
 
 namespace detail
 {
 // TODO: unit tests for this
-inline std::filesystem::path rel_path(std::string_view path, std::source_location location)
+inline std::filesystem::path rel_path(RelativePath rel, std::source_location location)
 {
     namespace fs = std::filesystem;
-    fs::path absFilePath = fs::absolute(fs::path(location.file_name()));
-    return std::move(absFilePath).parent_path() / path;
+    fs::path locPath = fs::path(location.file_name());
+    if (!locPath.is_absolute())
+        LOGF("zimmermann requires source_location::file_name() to be an absolute path, "
+             "file_name()="
+             << locPath);
+    return std::move(locPath).parent_path() / rel.path();
 }
 } // namespace detail
 
@@ -47,13 +98,13 @@ inline std::filesystem::path rel_path(std::string_view path, std::source_locatio
 inline File rel_file(std::string relPath,
                      std::source_location loc = std::source_location::current())
 {
-    return File{detail::rel_path(relPath, loc)};
+    return File{detail::rel_path(std::move(relPath), loc)};
 }
 
 inline Directory rel_dir(std::string relPath,
                          std::source_location loc = std::source_location::current())
 {
-    return Directory{detail::rel_path(relPath, loc)};
+    return Directory{detail::rel_path(std::move(relPath), loc)};
 }
 
 } // namespace zimm

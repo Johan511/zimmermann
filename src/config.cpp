@@ -66,7 +66,7 @@ void apply_arg(Config &cfg, std::string key, std::string value)
         else LOGE("Invalid key: misc is being ignored");
     }
 
-    if (!matched) cfg.misc[std::string{key}] = value;
+    if (!matched) cfg.misc[key] = value;
 }
 
 void apply_args(Config &cfg, std::ranges::range auto keysAndValues, int depth)
@@ -91,8 +91,8 @@ try
     Config cfg;
 
     // Set defaults
-    cfg.build_dir = Directory{fs::current_path()};
-    cfg.install_dir = Directory{fs::current_path().parent_path() / "install"};
+    cfg.build_dir = fs::current_path().string();
+    cfg.install_dir = (fs::current_path().parent_path() / "install").string();
     cfg.flags_debug = "-g";
     cfg.flags_release = "-O3 -DNDEBUG";
     cfg.flags_relwithdebinfo = "-O3 -g -DNDEBUG";
@@ -105,8 +105,8 @@ try
 
     // make sure the ordering of these depenedent defaults is correct
     // dependent defaults (defaults which depend on other variables)
-    if (cfg.compile_commands_path.path().empty())
-        cfg.compile_commands_path = cfg.build_dir.file("compile_commands.json");
+    if (cfg.compile_commands_path.empty())
+        cfg.compile_commands_path = (fs::path{cfg.build_dir} / "compile_commands.json").string();
 
     return cfg;
 }

@@ -27,10 +27,11 @@ __attribute__((weak)) Directory zimm_dir()
 {
     namespace fs = std::filesystem;
     auto loc = std::source_location::current();
-    return Directory{fs::path{fs::absolute(loc.file_name())} // "install/zimm/include/<file>"
-                         .parent_path()                      // "install/zimm/include/"
-                         .parent_path()                      // "install/zimm/"
-                         .parent_path()};                    // "install"
+    return Directory::make(fs::path{loc.file_name()} // "install/zimm/include/<file>"
+                               .parent_path()        // "install/zimm/include/"
+                               .parent_path()        // "install/zimm/"
+                               .parent_path()        // "install"
+                               .string());           // "install"
 }
 
 } // namespace zimm

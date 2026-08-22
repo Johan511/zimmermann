@@ -60,7 +60,7 @@ void setup_my_lib()
 {
     Directory libDir = rel_dir("my_install/my_lib/lib");
     Directory incDir = rel_dir("my_install/my_lib/include");
-    Directory tmpDir = rel_dir("tmp");
+    Directory tmpDir = Directory::make("tmp");
     fs::create_directories(libDir.path());
     fs::create_directories(incDir.path());
     fs::create_directories(tmpDir.path());

@@ -17,9 +17,13 @@ namespace zimm
 {
 Project::Project(std::string name, Config config, std::source_location mainFile)
     : m_name(std::move(name)), m_config(std::move(config)),
-      m_featureDetectionDir(m_config.build_dir), m_mainFilePath(mainFile.file_name())
+      m_buildDir(Directory::make(m_config.build_dir)),
+      m_installDir(Directory::make(m_config.install_dir)),
+      m_featureDetectionDir(m_buildDir),
+      m_compileCommandsPath(File::make(m_config.compile_commands_path)),
+      m_mainFilePath(File::make(std::string{mainFile.file_name()}))
 {
-    fs::create_directories(m_config.build_dir.path());
+    fs::create_directories(m_buildDir.path());
     fs::create_directories(m_featureDetectionDir.path());
 
     // clang-format off

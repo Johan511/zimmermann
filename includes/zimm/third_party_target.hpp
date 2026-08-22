@@ -3,6 +3,9 @@
 #include "path.hpp"
 #include "target.hpp"
 #include <format>
+#include <functional>
+#include <string_view>
+#include <tuple>
 
 namespace zimm
 {
@@ -62,15 +65,48 @@ public:
     const Directory &dir() const noexcept { return m_dir; }
 };
 
+struct MatchingDirPredicates
+{
+    using equality = std::equal_to<std::string_view>;
+
+    class atleast_version
+    {
+        const std::tuple<uint64_t, uint64_t, uint64_t> majorMinorPatch;
+
+    public:
+        atleast_version(uint64_t major = -1, uint64_t minor = -1, uint64_t patch = -1)
+        {
+            (void)major;
+            (void)minor;
+            (void)patch;
+        }
+        bool operator()(std::string_view dir, std::string_view target)
+        {
+            // TODO: parse the version suffix of dir and compare against
+            // majorMinorPatch
+            (void)dir;
+            (void)target;
+            return false;
+        }
+    };
+};
+
 class FindPackageTptStrategy
 {
     static std::vector<Directory> defaultPaths;
     std::vector<Directory> m_searchDirs;
 
+    using MatchingDirPred = std::function<bool(std::string_view /* the search directory */,
+                                               std::string_view /* targetName */)>;
+
+    MatchingDirPred m_matchingDir;
+
 public:
-    FindPackageTptStrategy(Directory searchPath);
-    FindPackageTptStrategy(std::vector<Directory> searchPaths);
-    FindPackageTptStrategy();
+    // clang-format off
+    FindPackageTptStrategy(Directory searchPath, MatchingDirPred = MatchingDirPredicates::equality{});
+    FindPackageTptStrategy(std::vector<Directory> searchPaths, MatchingDirPred = MatchingDirPredicates::equality{});
+    FindPackageTptStrategy(MatchingDirPred = MatchingDirPredicates::equality{});
+    // clang-format on
     ThirdPartyTarget *attempt(std::string_view name) const;
 };
 
@@ -94,7 +130,7 @@ inline std::string git_fetch(const Directory &dir, std::string_view url, std::st
 {
     return std::format("cd {0} && git init . && "
                        "git remote add origin {1} && "
-                       "git fetch origin {2} && "
+                       "git fetch --depth=1 origin {2} && "
                        "git checkout FETCH_HEAD",
                        dir.path().string(), url, id);
 }
