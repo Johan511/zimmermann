@@ -35,6 +35,9 @@ public:
         return m_globalProperties;
     }
     const File &main_file_path() const noexcept { return m_mainFilePath; }
+    const Directory &build_dir() const noexcept { return m_buildDir; }
+    const Directory &install_dir() const noexcept { return m_installDir; }
+    const File &compile_commands_path() const noexcept { return m_compileCommandsPath; }
     Installer &installer() noexcept { return m_installer; }
     Tester &tester() noexcept { return m_tester; }
 
@@ -49,8 +52,6 @@ public:
         m_globalProperties.push_back(std::move(property));
     }
 
-    const Directory &build_dir() { return m_config.build_dir; }
-
     std::unordered_set<Target *> seach_all_targets() const;
 
     // feature detection
@@ -62,12 +63,14 @@ public:
     std::optional<size_t> check_type_size(std::string type, std::vector<std::string> headers);
 
 private:
+    Directory m_buildDir;
+    Directory m_installDir;
     Directory m_featureDetectionDir;
+    File m_compileCommandsPath;
+    File m_mainFilePath;
 
     Installer m_installer;
     Tester m_tester;
-
-    File m_mainFilePath;
 };
 
 void generate_build(Project &project);

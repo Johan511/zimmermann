@@ -2,19 +2,25 @@
 
 namespace zimm
 {
-std::vector<Directory> FindPackageTptStrategy::defaultPaths = {Directory{"/usr"}};
+std::vector<Directory> FindPackageTptStrategy::defaultPaths = {Directory::make("/usr")};
 
-FindPackageTptStrategy::FindPackageTptStrategy(Directory searchPath)
+FindPackageTptStrategy::FindPackageTptStrategy(Directory searchPath, MatchingDirPred matchingDir)
+    : m_matchingDir(std::move(matchingDir))
 {
     m_searchDirs.push_back(std::move(searchPath));
 }
 
-FindPackageTptStrategy::FindPackageTptStrategy(std::vector<Directory> searchPaths)
+FindPackageTptStrategy::FindPackageTptStrategy(std::vector<Directory> searchPaths,
+                                               MatchingDirPred matchingDir)
+    : m_matchingDir(std::move(matchingDir))
 {
     for (auto &searchPath : searchPaths) m_searchDirs.push_back(std::move(searchPath));
 }
 
-FindPackageTptStrategy::FindPackageTptStrategy() : FindPackageTptStrategy(defaultPaths) {}
+FindPackageTptStrategy::FindPackageTptStrategy(MatchingDirPred matchingDir)
+    : m_searchDirs(defaultPaths), m_matchingDir(std::move(matchingDir))
+{
+}
 
 ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
 {
@@ -25,7 +31,7 @@ ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
         const fs::path &path = searchDir.path();
         if (!fs::is_directory(path)) continue;
 
-        if (path.has_filename() && path.filename().c_str() == name)
+        if (m_matchingDir(searchDir.dir_name(), name))
             return ThirdPartyTarget::make(std::string{name}, searchDir);
 
         using fs::directory_options::skip_permission_denied;
@@ -35,8 +41,9 @@ ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
         {
             if (!child.is_directory()) continue;
             const fs::path &childPath = child.path();
-            if (childPath.filename().c_str() != name) continue;
-            return ThirdPartyTarget::make(std::string{name}, Directory{childPath});
+            if (m_matchingDir(childPath.filename().c_str(), name))
+                return ThirdPartyTarget::make(std::string{name},
+                                              Directory::make(childPath.string()));
         }
     }
     return nullptr;

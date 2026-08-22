@@ -17,18 +17,14 @@ class Installer
 public:
     Installer() {}
 
-    // file copied into installSubDir
-    void install(std::string_view installSubDir, File from)
+    void install(detail::RelativePath installSubDir, File from)
     {
-        // todo: add std::string_view comparator to map
-        m_installFiles[std::string{installSubDir}].push_back(std::move(from));
+        m_installFiles[std::move(installSubDir).string()].push_back(std::move(from));
     }
 
-    // directory contents are copied into installSubDir
-    void install(std::string_view installSubDir, Directory from)
+    void install(detail::RelativePath installSubDir, Directory from)
     {
-        // todo: add std::string_view comparator to map
-        m_installDirs[std::string{installSubDir}].push_back(std::move(from));
+        m_installDirs[std::move(installSubDir).string()].push_back(std::move(from));
     }
 
     void install_binary(Executable *exe) { m_installTargets.push_back(exe); }

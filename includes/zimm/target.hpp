@@ -7,6 +7,7 @@
 #include "properties.hpp"
 
 #include <initializer_list>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -32,10 +33,10 @@ namespace detail
 class AssumedTrait
 {
     friend class zimm::ThirdPartyTarget;
-    File m_assumedPath{""};
+    std::optional<File> m_assumedPath;
 
 public:
-    const File &assumed_path() const noexcept { return m_assumedPath; }
+    const std::optional<File> &assumed_path() const noexcept { return m_assumedPath; }
 };
 
 class SourcesTrait
