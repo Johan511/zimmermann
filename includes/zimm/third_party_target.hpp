@@ -29,6 +29,23 @@ concept ThirdPartyTargetStrategy = requires(const Strategy &s) {
     { s.attempt(std::string_view{} /* name */) } -> std::same_as<class ThirdPartyTarget *>;
 };
 
+class ThirdPartyTargetManifest
+{
+    using Entry = std::tuple<TargetType, std::string /*name*/, std::string /* file / dir */>;
+    const std::vector<Entry> m_manifest;
+
+public:
+    std::span<const Entry> type(TargetType type) const noexcept {}
+    const Entry &name(std::string_view name) const noexcept {}
+    const Entry &
+    name(std::function<bool(std::string_view, std::string_view)> /* name matching function */)
+        const noexcept
+    {
+    }
+
+    std::span<const Entry> entries() const noexcept {}
+};
+
 class ThirdPartyTarget : public Target
 {
     Directory m_dir;
@@ -40,11 +57,12 @@ class ThirdPartyTarget : public Target
 
 public:
     template <ThirdPartyTargetStrategy... Strategies>
-    static ThirdPartyTarget *make(std::string name, const Strategies &...strategies)
+    static std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest>
+    make(std::string name, const Strategies &...strategies)
     {
         static_assert(sizeof...(strategies) > 0);
-        ThirdPartyTarget *result = nullptr;
-        if (!(... || (result = strategies.attempt(name), result)))
+        std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest> result{};
+        if (!(... || (result = strategies.attempt(name), result.first)))
             LOGI("Failed to make third party target");
         return result;
     }
@@ -56,9 +74,14 @@ public:
                                     std::move(buildCmd)};
     }
 
-    Executable *assume_executable(std::string name, std::string pathRelToTptDir);
-    StaticLibrary *assume_static_library(std::string name, std::string pathRelToTptDir);
-    SharedLibrary *assume_shared_library(std::string name, std::string pathRelToTptDir);
+    Executable *assume_executable(std::string name, detail::RelativePath pathRelToTptDir);
+    StaticLibrary *assume_static_library(std::string name, detail::RelativePath pathRelToTptDir);
+    SharedLibrary *assume_shared_library(std::string name, detail::RelativePath pathRelToTptDir);
+    HeaderOnlyLibrary *assumed_ho_library(std::string name, detail::RelativePath pathRelToTptDir);
+    Target *assume_target(TargetType, std::string name, detail::RelativePath pathRelToTptDir);
+
+    std::pair<std::vector<Executable *>, std::vector<Library *>>
+    assume_manifest(const ThirdPartyTargetManifest &);
 
     std::string_view meta_build_cmd() const noexcept { return m_metaBuildCmd; }
     std::string_view build_cmd() const noexcept { return m_buildCmd; }
@@ -108,6 +131,16 @@ public:
     FindPackageTptStrategy(MatchingDirPred = MatchingDirPredicates::equality{});
     // clang-format on
     ThirdPartyTarget *attempt(std::string_view name) const;
+};
+
+class FindCmakePackageTptStrategy
+{
+    std::vector<Directory> m_searchDirs;
+
+    using MatchingDirPred = std::function<bool(std::string_view /* the search directory */,
+                                               std::string_view /* targetName */)>;
+
+    MatchingDirPred m_matchingDir;
 };
 
 class FetchContentTptStrategy
