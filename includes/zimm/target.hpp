@@ -57,12 +57,17 @@ public:
         for (const auto &source : sources) add_source(source);
     }
     std::span<const File> sources() const noexcept { return m_sources; }
+    virtual ~SourcesTrait() = default;
+};
 
+class LinkTrait
+{
+public:
     void link_with(const PublicTag *, Library *linkLib);
     void link_with(const PrivateTag *, Library *linkLib);
     void link_with(const PublicTag *, std::initializer_list<Library *> linkLibs);
     void link_with(const PrivateTag *, std::initializer_list<Library *> linkLibs);
-    virtual ~SourcesTrait() = default;
+    virtual ~LinkTrait() = default;
 };
 
 struct CustomTargetBase
@@ -131,13 +136,13 @@ protected:
     Library(TargetType type, std::string name) noexcept : Target(type, std::move(name)) {}
 };
 
-class Executable : public Target, public detail::SourcesTrait
+class Executable : public Target, public detail::SourcesTrait, public detail::LinkTrait
 {
 public:
     Executable(std::string name) noexcept : Target(TargetType::Executable, std::move(name)) {}
 };
 
-class StaticLibrary : public Library, public detail::SourcesTrait
+class StaticLibrary : public Library, public detail::SourcesTrait, public detail::LinkTrait
 {
 public:
     explicit StaticLibrary(std::string name) noexcept
@@ -146,7 +151,7 @@ public:
     }
 };
 
-class SharedLibrary : public Library, public detail::SourcesTrait
+class SharedLibrary : public Library, public detail::SourcesTrait, public detail::LinkTrait
 {
 public:
     explicit SharedLibrary(std::string name) noexcept

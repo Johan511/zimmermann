@@ -78,12 +78,13 @@ public:
 
 namespace detail
 {
+class LinkTrait;
 class SourcesTrait;
 }
 
 class LinkTargetProperty : public Property
 {
-    friend detail::SourcesTrait;
+    friend detail::LinkTrait;
     const class Library *m_linkLib;
     explicit LinkTargetProperty(const Library *target);
 

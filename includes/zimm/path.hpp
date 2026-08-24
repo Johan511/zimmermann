@@ -1,6 +1,7 @@
 #pragma once
 
 #include "logger.hpp"
+#include <concepts>
 #include <filesystem>
 #include <iomanip>
 #include <source_location>
@@ -16,7 +17,10 @@ class RelativePath
     std::filesystem::path m_path;
 
 public:
-    RelativePath(auto &&p) : m_path(std::forward<decltype(p)>(p))
+    // constrained so it doesn't shadow the copy/move ctors for RelativePath arguments
+    template <typename P>
+        requires(!std::same_as<std::remove_cvref_t<P>, RelativePath>)
+    RelativePath(P &&p) : m_path(std::forward<P>(p))
     {
         if (m_path.empty() || !m_path.is_relative())
             LOGF("path=" << m_path << " is not a non-empty relative path");

@@ -15,6 +15,7 @@ add_library(zimmermann STATIC
     src/gen_cc.cpp
     src/generate_build.cpp
     src/third_party_target.cpp
+    src/find_cmake_tpt_strategy.cpp
 )
 target_compile_options(zimmermann PRIVATE "-freflection")
 

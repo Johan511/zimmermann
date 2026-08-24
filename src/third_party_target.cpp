@@ -22,7 +22,8 @@ FindPackageTptStrategy::FindPackageTptStrategy(MatchingDirPred matchingDir)
 {
 }
 
-ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
+std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest>
+FindPackageTptStrategy::attempt(std::string_view name) const
 {
     namespace fs = std::filesystem;
 
@@ -32,7 +33,7 @@ ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
         if (!fs::is_directory(path)) continue;
 
         if (m_matchingDir(searchDir.dir_name(), name))
-            return ThirdPartyTarget::make(std::string{name}, searchDir);
+            return {ThirdPartyTarget::make(std::string{name}, searchDir), {}};
 
         using fs::directory_options::skip_permission_denied;
         // TODO: do we need follow_directory_symlink?
@@ -42,11 +43,12 @@ ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
             if (!child.is_directory()) continue;
             const fs::path &childPath = child.path();
             if (m_matchingDir(childPath.filename().c_str(), name))
-                return ThirdPartyTarget::make(std::string{name},
-                                              Directory::make(childPath.string()));
+                return {
+                    ThirdPartyTarget::make(std::string{name}, Directory::make(childPath.string())),
+                    {}};
         }
     }
-    return nullptr;
+    return {nullptr, {}};
 }
 
 FetchContentTptStrategy::FetchContentTptStrategy(Directory dir, std::string fetchContentCmd,
@@ -56,7 +58,8 @@ FetchContentTptStrategy::FetchContentTptStrategy(Directory dir, std::string fetc
 {
 }
 
-ThirdPartyTarget *FetchContentTptStrategy::attempt(std::string_view name) const
+std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest>
+FetchContentTptStrategy::attempt(std::string_view name) const
 {
     namespace fs = std::filesystem;
 
@@ -66,8 +69,9 @@ ThirdPartyTarget *FetchContentTptStrategy::attempt(std::string_view name) const
     MetaBuildCmd fetchAndMetaBuild =
         MetaBuildCmd{std::format("cd {} && {} && {}", m_dir.path().string(),
                                  std::move(fetchContentCmd), std::move(metaBuildCmd))};
-    return ThirdPartyTarget::make(std::string{name}, m_dir, std::move(fetchAndMetaBuild),
-                                  m_buildCmd);
+    return {
+        ThirdPartyTarget::make(std::string{name}, m_dir, std::move(fetchAndMetaBuild), m_buildCmd),
+        {}};
 }
 
 ThirdPartyTarget::ThirdPartyTarget(std::string name, Directory dir, MetaBuildCmd metaBuildCmd,
@@ -77,7 +81,8 @@ ThirdPartyTarget::ThirdPartyTarget(std::string name, Directory dir, MetaBuildCmd
 {
 }
 
-Executable *ThirdPartyTarget::assume_executable(std::string name, std::string pathRelToTptDir)
+Executable *ThirdPartyTarget::assume_executable(std::string name,
+                                                detail::RelativePath pathRelToTptDir)
 {
     auto target = make_executable(std::move(name));
     add_dependency_rel(target, this);
@@ -86,7 +91,7 @@ Executable *ThirdPartyTarget::assume_executable(std::string name, std::string pa
 }
 
 StaticLibrary *ThirdPartyTarget::assume_static_library(std::string name,
-                                                       std::string pathRelToTptDir)
+                                                       detail::RelativePath pathRelToTptDir)
 {
     auto target = make_static_library(std::move(name));
     add_dependency_rel(target, this);
@@ -95,12 +100,85 @@ StaticLibrary *ThirdPartyTarget::assume_static_library(std::string name,
 }
 
 SharedLibrary *ThirdPartyTarget::assume_shared_library(std::string name,
-                                                       std::string pathRelToTptDir)
+                                                       detail::RelativePath pathRelToTptDir)
 {
     auto target = make_shared_library(std::move(name));
     add_dependency_rel(target, this);
     target->m_assumedPath = m_dir.file(pathRelToTptDir);
     return target;
+}
+
+HeaderOnlyLibrary *ThirdPartyTarget::assumed_ho_library(std::string name,
+                                                        detail::RelativePath pathRelToTptDir)
+{
+    auto target = make_header_only_library(std::move(name));
+    add_dependency_rel(target, this);
+    // header-only targets have no artifact; the path names their include dir
+    target->add_public_property(IncludeProperty{m_dir.subdir(pathRelToTptDir)});
+    return target;
+}
+
+Target *ThirdPartyTarget::assume_target(TargetType type, std::string name,
+                                        detail::RelativePath pathRelToTptDir)
+{
+    switch (type)
+    {
+    case TargetType::Executable:
+        return assume_executable(std::move(name), std::move(pathRelToTptDir));
+    case TargetType::StaticLibrary:
+        return assume_static_library(std::move(name), std::move(pathRelToTptDir));
+    case TargetType::SharedLibrary:
+        return assume_shared_library(std::move(name), std::move(pathRelToTptDir));
+    case TargetType::HeaderOnlyLibrary:
+        return assumed_ho_library(std::move(name), std::move(pathRelToTptDir));
+    default:
+        LOGE("ThirdPartyTarget::assume_target: unsupported TargetType " << to_string(type)
+                                                                        << " for '" << name << "'");
+        return nullptr;
+    }
+}
+
+std::pair<std::vector<Executable *>, std::vector<Library *>>
+ThirdPartyTarget::assume_manifest(const ThirdPartyTargetManifest &manifest)
+{
+    std::vector<Executable *> exes;
+    std::vector<Library *> libs;
+
+    for (const auto &[type, name, path] : manifest.entries())
+    {
+        // manifest paths are always relative to the tpt dir
+        Target *target = assume_target(type, name, detail::RelativePath{path});
+        if (!target) continue;
+        if (target->type() == TargetType::Executable)
+            exes.push_back(static_cast<Executable *>(target));
+        else libs.push_back(static_cast<Library *>(target));
+    }
+    return {std::move(exes), std::move(libs)};
+}
+
+std::vector<ThirdPartyTargetManifest::Entry> ThirdPartyTargetManifest::type(TargetType type) const
+    noexcept
+{
+    std::vector<Entry> result;
+    for (const auto &entry : m_manifest)
+        if (std::get<0>(entry) == type) result.push_back(entry);
+    return result;
+}
+
+std::optional<ThirdPartyTargetManifest::Entry>
+ThirdPartyTargetManifest::name(std::string_view name) const noexcept
+{
+    for (const auto &entry : m_manifest)
+        if (std::get<1>(entry) == name) return entry;
+    return std::nullopt;
+}
+
+std::optional<ThirdPartyTargetManifest::Entry> ThirdPartyTargetManifest::name(
+    std::function<bool(std::string_view, std::string_view)> nameMatchingFunction) const noexcept
+{
+    for (const auto &entry : m_manifest)
+        if (nameMatchingFunction(std::get<1>(entry), std::get<2>(entry))) return entry;
+    return std::nullopt;
 }
 
 } // namespace zimm

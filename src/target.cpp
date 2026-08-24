@@ -67,26 +67,26 @@ std::string to_string(const TargetType &type)
     std::unreachable();
 }
 
-void detail::SourcesTrait::link_with(const PublicTag *, Library *linkLib)
+void detail::LinkTrait::link_with(const PublicTag *, Library *linkLib)
 {
     Target *thisTarget = dynamic_cast<Target *>(this);
     add_dependency_rel(thisTarget, linkLib);
     thisTarget->add_property(public_, LinkTargetProperty{linkLib});
 }
 
-void detail::SourcesTrait::link_with(const PrivateTag *, Library *linkLib)
+void detail::LinkTrait::link_with(const PrivateTag *, Library *linkLib)
 {
     Target *thisTarget = dynamic_cast<Target *>(this);
     add_dependency_rel(thisTarget, linkLib);
     thisTarget->add_property(private_, LinkTargetProperty{linkLib});
 }
 
-void detail::SourcesTrait::link_with(const PublicTag *, std::initializer_list<Library *> linkLibs)
+void detail::LinkTrait::link_with(const PublicTag *, std::initializer_list<Library *> linkLibs)
 {
     for (auto *linkLib : linkLibs) link_with(public_, linkLib);
 }
 
-void detail::SourcesTrait::link_with(const PrivateTag *, std::initializer_list<Library *> linkLibs)
+void detail::LinkTrait::link_with(const PrivateTag *, std::initializer_list<Library *> linkLibs)
 {
     for (auto *linkLib : linkLibs) link_with(private_, linkLib);
 }

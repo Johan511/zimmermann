@@ -24,26 +24,38 @@ struct MetaBuildCmd
     MetaBuildCmd() : cmd("") {};
 };
 
-template <typename Strategy>
-concept ThirdPartyTargetStrategy = requires(const Strategy &s) {
-    { s.attempt(std::string_view{} /* name */) } -> std::same_as<class ThirdPartyTarget *>;
-};
-
 class ThirdPartyTargetManifest
 {
+public:
+    // name: verbatim CMake target name (may contain "::")
+    // file / dir: ALWAYS relative to the ThirdPartyTarget's dir — for located targets the
+    //             artifact path, for header-only targets their include dir (non-empty).
     using Entry = std::tuple<TargetType, std::string /*name*/, std::string /* file / dir */>;
-    const std::vector<Entry> m_manifest;
+
+private:
+    std::vector<Entry> m_manifest;
 
 public:
-    std::span<const Entry> type(TargetType type) const noexcept {}
-    const Entry &name(std::string_view name) const noexcept {}
-    const Entry &
-    name(std::function<bool(std::string_view, std::string_view)> /* name matching function */)
-        const noexcept
+    ThirdPartyTargetManifest() = default;
+    explicit ThirdPartyTargetManifest(std::vector<Entry> manifest) : m_manifest(std::move(manifest))
     {
     }
 
-    std::span<const Entry> entries() const noexcept {}
+    std::span<const Entry> entries() const noexcept { return m_manifest; }
+
+    std::vector<Entry> type(TargetType type) const noexcept;
+    std::optional<Entry> name(std::string_view name) const noexcept;
+    std::optional<Entry>
+    name(std::function<bool(std::string_view, std::string_view)> /* name matching function */)
+        const noexcept;
+};
+
+class ThirdPartyTarget;
+template <typename Strategy>
+concept ThirdPartyTargetStrategy = requires(const Strategy &s) {
+    {
+        s.attempt(std::string_view{} /* name */)
+    } -> std::same_as<std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest>>;
 };
 
 class ThirdPartyTarget : public Target
@@ -130,17 +142,22 @@ public:
     FindPackageTptStrategy(std::vector<Directory> searchPaths, MatchingDirPred = MatchingDirPredicates::equality{});
     FindPackageTptStrategy(MatchingDirPred = MatchingDirPredicates::equality{});
     // clang-format on
-    ThirdPartyTarget *attempt(std::string_view name) const;
+    std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest> attempt(std::string_view name) const;
 };
 
 class FindCmakePackageTptStrategy
 {
-    std::vector<Directory> m_searchDirs;
+    std::vector<Directory> m_searchDirs; // empty default → omit CMAKE_PREFIX_PATH (CMake's own defaults)
+    std::string m_findPackageArgs;      // e.g. "1.2 COMPONENTS foo", appended after "CONFIG REQUIRED"
+    std::string m_buildType;            // zimm-style, default "relwithdebinfo" (matches Config::build_type)
 
-    using MatchingDirPred = std::function<bool(std::string_view /* the search directory */,
-                                               std::string_view /* targetName */)>;
-
-    MatchingDirPred m_matchingDir;
+public:
+    // clang-format off
+    FindCmakePackageTptStrategy(Directory searchPath, std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo");
+    FindCmakePackageTptStrategy(std::vector<Directory> searchPaths, std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo");
+    FindCmakePackageTptStrategy(std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo");
+    // clang-format on
+    std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest> attempt(std::string_view name) const;
 };
 
 class FetchContentTptStrategy
@@ -153,11 +170,12 @@ class FetchContentTptStrategy
 public:
     FetchContentTptStrategy(Directory dir, std::string fetchContentCmd, MetaBuildCmd metaBuildCmd,
                             BuildCmd buildCmd);
-    ThirdPartyTarget *attempt(std::string_view name) const;
+    std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest> attempt(std::string_view name) const;
 };
 
 static_assert(ThirdPartyTargetStrategy<FindPackageTptStrategy>);
 static_assert(ThirdPartyTargetStrategy<FetchContentTptStrategy>);
+static_assert(ThirdPartyTargetStrategy<FindCmakePackageTptStrategy>);
 
 inline std::string git_fetch(const Directory &dir, std::string_view url, std::string_view id)
 {
