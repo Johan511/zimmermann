@@ -1,4 +1,5 @@
 #include "zimm/third_party_target.hpp"
+#include <ranges>
 
 namespace zimm
 {
@@ -42,12 +43,13 @@ ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
             if (!child.is_directory()) continue;
             const fs::path &childPath = child.path();
             if (m_matchingDir(childPath.filename().c_str(), name))
+
                 return ThirdPartyTarget::make(std::string{name},
                                               Directory::make(childPath.string()));
         }
     }
     return nullptr;
-}
+};
 
 FetchContentTptStrategy::FetchContentTptStrategy(Directory dir, std::string fetchContentCmd,
                                                  MetaBuildCmd metaBuildCmd, BuildCmd buildCmd)
@@ -77,30 +79,117 @@ ThirdPartyTarget::ThirdPartyTarget(std::string name, Directory dir, MetaBuildCmd
 {
 }
 
-Executable *ThirdPartyTarget::assume_executable(std::string name, std::string pathRelToTptDir)
+Executable *ThirdPartyTarget::assume_executable(std::string name, std::string path)
 {
     auto target = make_executable(std::move(name));
     add_dependency_rel(target, this);
-    target->m_assumedPath = m_dir.file(pathRelToTptDir);
+    target->m_assumedPath = File::make(m_dir.path() / std::move(path));
     return target;
 }
 
-StaticLibrary *ThirdPartyTarget::assume_static_library(std::string name,
-                                                       std::string pathRelToTptDir)
+StaticLibrary *ThirdPartyTarget::assume_static_library(std::string name, std::string path)
 {
     auto target = make_static_library(std::move(name));
     add_dependency_rel(target, this);
-    target->m_assumedPath = m_dir.file(pathRelToTptDir);
+    target->m_assumedPath = File::make(m_dir.path() / std::move(path));
     return target;
 }
 
-SharedLibrary *ThirdPartyTarget::assume_shared_library(std::string name,
-                                                       std::string pathRelToTptDir)
+SharedLibrary *ThirdPartyTarget::assume_shared_library(std::string name, std::string path)
 {
     auto target = make_shared_library(std::move(name));
     add_dependency_rel(target, this);
-    target->m_assumedPath = m_dir.file(pathRelToTptDir);
+    target->m_assumedPath = File::make(m_dir.path() / std::move(path));
     return target;
 }
 
+HeaderOnlyLibrary *ThirdPartyTarget::assume_ho_library(std::string name, std::string path)
+{
+    auto target = make_header_only_library(std::move(name));
+    add_dependency_rel(target, this);
+    // header-only targets have assumed path; the path names their include dir
+    target->add_public_property(IncludeProperty{Directory::make(m_dir.path() / std::move(path))});
+    return target;
+}
+
+Target *ThirdPartyTarget::assume_target(TargetType type, std::string name, std::string path)
+{
+    switch (type)
+    {
+    case TargetType::Executable:
+        return assume_executable(std::move(name), std::move(path));
+    case TargetType::StaticLibrary:
+        return assume_static_library(std::move(name), std::move(path));
+    case TargetType::SharedLibrary:
+        return assume_shared_library(std::move(name), std::move(path));
+    case TargetType::HeaderOnlyLibrary:
+        return assume_ho_library(std::move(name), std::move(path));
+    default:
+        LOGE("ThirdPartyTarget::assume_target: unsupported TargetType " << to_string(type)
+                                                                        << " for '" << name << "'");
+        return nullptr;
+    }
+}
+
+template <typename T>
+std::vector<T *> filter(auto &targets, std::optional<TargetType> type, std::string name)
+{
+    return targets |
+           std::views::filter(
+               [&](const Target *t)
+               {
+                   if (type && t->type() != *type) return false;
+                   return name.empty() || t->name() == name;
+               }) |
+           std::views::transform([](Target *t) { return static_cast<T *>(t); }) |
+           std::ranges::to<std::vector>();
+}
+
+std::vector<StaticLibrary *> ThirdPartyTargetManifest::static_libs(std::string name)
+{
+    return filter<StaticLibrary>(m_assumed, TargetType::StaticLibrary, std::move(name));
+}
+std::vector<SharedLibrary *> ThirdPartyTargetManifest::shared_libs(std::string name)
+{
+    return filter<SharedLibrary>(m_assumed, TargetType::SharedLibrary, std::move(name));
+}
+std::vector<HeaderOnlyLibrary *> ThirdPartyTargetManifest::ho_libs(std::string name)
+{
+    return filter<HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary, std::move(name));
+}
+std::vector<Executable *> ThirdPartyTargetManifest::execs(std::string name)
+{
+    return filter<Executable>(m_assumed, TargetType::Executable, std::move(name));
+}
+
+std::vector<Target *> ThirdPartyTargetManifest::targets(std::string name)
+{
+    return filter<Target>(m_assumed, std::nullopt, std::move(name));
+}
+
+std::vector<const StaticLibrary *> ThirdPartyTargetManifest::static_libs(std::string name) const
+{
+    return filter<const StaticLibrary>(m_assumed, TargetType::StaticLibrary, std::move(name));
+}
+
+std::vector<const SharedLibrary *> ThirdPartyTargetManifest::shared_libs(std::string name) const
+{
+    return filter<const SharedLibrary>(m_assumed, TargetType::SharedLibrary, std::move(name));
+}
+
+std::vector<const HeaderOnlyLibrary *> ThirdPartyTargetManifest::ho_libs(std::string name) const
+{
+    return filter<const HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary,
+                                           std::move(name));
+}
+
+std::vector<const Executable *> ThirdPartyTargetManifest::execs(std::string name) const
+{
+    return filter<const Executable>(m_assumed, TargetType::Executable, std::move(name));
+}
+
+std::vector<const Target *> ThirdPartyTargetManifest::targets(std::string name) const
+{
+    return filter<const Target>(m_assumed, std::nullopt, std::move(name));
+}
 } // namespace zimm

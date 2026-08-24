@@ -1,14 +1,8 @@
-#include <cstdlib>
-#include <fstream>
+#include <iostream>
 #include <string>
 #include <zimm/zimm.hpp>
 
 using namespace zimm;
-namespace fs = std::filesystem;
-
-// environment setup to place a dummy library called my_lib at ./my_install/my_lib/[lib, include]
-// necessery to test FindPackage
-void setup_my_lib();
 
 int main()
 {
@@ -16,20 +10,29 @@ int main()
     Project prj{"ThirdPartyTarget Example", std::move(cfg.value())};
     prj.add_global_property(CompileFlagProperty{"-std=c++20"});
 
-    setup_my_lib();
+    // find_package(Boost CONFIG REQUIRED COMPONENTS program_options) runs under the hood;
+    // the strategy materializes an assumed target per imported target the config defines.
+    FindCmakePackageTptStrategy boostStrategy{"COMPONENTS program_options"};
+    ThirdPartyTargetManifest boostManifest = boostStrategy.attempt("Boost");
+    ThirdPartyTarget *boostTpt = boostManifest.tpt();
 
-    auto myLibTpt = ThirdPartyTarget::make("my_lib", FindPackageTptStrategy{rel_dir("my_install")});
-    auto myLib = myLibTpt->assume_static_library("my_lib", "lib/my_lib.a");
-    myLib->add_public_property(IncludeProperty{rel_dir("my_install/my_lib/include")});
+    // get the Library* to link by name from the populated dependencies
+    auto depByName = [](const ThirdPartyTarget *tpt, std::string_view name) -> Library *
+    {
+        for (Target *d : tpt->dependencies())
+            if (d->name() == name) return dynamic_cast<Library *>(d);
+        return nullptr;
+    };
+    // Boost::program_options — its Boost::headers dep's include dirs ride along transitively
+    auto po = depByName(boostTpt, "program_options");
 
     Directory gtestDir = prj.build_dir().subdir("googletest");
-    auto gtestTpt = ThirdPartyTarget::make(
+    ThirdPartyTarget *gtestTpt = ThirdPartyTarget::make(
         "googletest",
         FetchContentTptStrategy{
             gtestDir,
             git_fetch(gtestDir, "https://github.com/google/googletest.git", "tag v1.17.0"),
             MetaBuildCmd{"cmake -S . -B build"}, BuildCmd{"cmake --build build"}});
-
     auto gtestLib = gtestTpt->assume_static_library("gtest", "build/lib/libgtest.a");
     gtestTpt->add_public_property(IncludeProperty{gtestDir.subdir("googletest/include")});
     gtestTpt->add_public_property(IncludeProperty{gtestDir.subdir("googlemock/include")});
@@ -37,16 +40,14 @@ int main()
     Directory httplibDir = prj.build_dir().subdir("cpp-httplib");
     std::string httplibFetch =
         git_fetch(httplibDir, "https://github.com/yhirose/cpp-httplib.git", "tag v0.52.0");
-    auto httpLibTpt = ThirdPartyTarget::make(
+    ThirdPartyTarget *httpLibTpt = ThirdPartyTarget::make(
         "httplib", FindPackageTptStrategy{},
         FetchContentTptStrategy{httplibDir, httplibFetch, MetaBuildCmd{""}, BuildCmd{""}});
-    // auto httpLib = httplibTpt->assume_static_library("httplib", "httplib");
-    // TODO: add header only library, or atleast assume_header_only_target
     httpLibTpt->add_public_property(IncludeProperty{httplibDir});
 
     auto app = make_executable("tpt_demo");
     app->add_source(rel_file("main.cpp"));
-    app->link_with(private_, myLib);
+    app->link_with(private_, po);
     app->link_with(private_, gtestLib);
     add_dependency_rel(app, httpLibTpt);
 
@@ -54,40 +55,4 @@ int main()
     prj.installer().install_binary(app);
 
     generate_build(prj);
-}
-
-void setup_my_lib()
-{
-    Directory libDir = rel_dir("my_install/my_lib/lib");
-    Directory incDir = rel_dir("my_install/my_lib/include");
-    Directory tmpDir = Directory::make("tmp");
-    fs::create_directories(libDir.path());
-    fs::create_directories(incDir.path());
-    fs::create_directories(tmpDir.path());
-
-    std::ofstream srcOfs{tmpDir.file("my_lib.cpp").path()};
-    // clang-format off
-    static constexpr auto SRC =
-        "#include \"my_lib.hpp\"\n"
-        "void my_lib_func() { }";
-    // clang-format on
-    srcOfs << SRC << std::endl;
-
-    std::ofstream hdrOfs{tmpDir.file("my_lib.hpp").path()};
-    static constexpr auto HDR = "void my_lib_func(void);";
-    hdrOfs << HDR << std::endl;
-
-    auto myLibO = tmpDir.file("my_lib.o");
-    auto myLibCpp = tmpDir.file("my_lib.cpp");
-    auto myLibHpp = tmpDir.file("my_lib.hpp");
-    std::system(
-        std::format("g++ {} -c -o {}", myLibCpp.path().string(), myLibO.path().string()).c_str());
-    std::system(
-        std::format("ar rcs {} {}", libDir.file("my_lib.a").path().string(), myLibO.path().string())
-            .c_str());
-    std::system(
-        std::format("cp {} {}", myLibHpp.path().string(), incDir.file("my_lib.hpp").path().string())
-            .c_str());
-
-    fs::remove_all(tmpDir.path());
 }

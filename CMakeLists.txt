@@ -15,6 +15,7 @@ add_library(zimmermann STATIC
     src/gen_cc.cpp
     src/generate_build.cpp
     src/third_party_target.cpp
+    src/find_cmake_tpt_strategy.cpp
 )
 target_compile_options(zimmermann PRIVATE "-freflection")
 
@@ -87,3 +88,7 @@ set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
 set(CPACK_RPM_PACKAGE_REQUIRES "glibc >= 2.34, libstdc++ >= 11")
 
 include(CPack)
+
+# Auxillary targets
+add_executable(CMAKE_IMPORT_ZE_BUILD zimm_testing/cmake_import/to_docker/ze_build.cpp)
+target_link_libraries(CMAKE_IMPORT_ZE_BUILD zimmermann)

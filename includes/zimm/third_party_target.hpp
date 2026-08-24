@@ -4,6 +4,7 @@
 #include "target.hpp"
 #include <format>
 #include <functional>
+#include <span>
 #include <string_view>
 #include <tuple>
 
@@ -24,9 +25,41 @@ struct MetaBuildCmd
     MetaBuildCmd() : cmd("") {};
 };
 
+class ThirdPartyTargetManifest
+{
+    ThirdPartyTarget *m_tpt = nullptr;
+    std::vector<Target *> m_assumed;
+
+public:
+    ThirdPartyTargetManifest() = default;
+    ThirdPartyTargetManifest(ThirdPartyTarget *tpt, std::vector<Target *> assumed)
+        : m_tpt(tpt), m_assumed(std::move(assumed))
+    {
+    }
+
+    ThirdPartyTarget *tpt() { return m_tpt; }
+    const ThirdPartyTarget *tpt() const { return m_tpt; }
+
+    std::vector<StaticLibrary *> static_libs(std::string name = "");
+    std::vector<const StaticLibrary *> static_libs(std::string name = "") const;
+
+    std::vector<SharedLibrary *> shared_libs(std::string name = "");
+    std::vector<const SharedLibrary *> shared_libs(std::string name = "") const;
+
+    std::vector<HeaderOnlyLibrary *> ho_libs(std::string name = "");
+    std::vector<const HeaderOnlyLibrary *> ho_libs(std::string name = "") const;
+
+    std::vector<Executable *> execs(std::string name = "");
+    std::vector<const Executable *> execs(std::string name = "") const;
+
+    std::vector<Target *> targets(std::string name = "");
+    std::vector<const Target *> targets(std::string name = "") const;
+};
+
+class ThirdPartyTarget;
 template <typename Strategy>
 concept ThirdPartyTargetStrategy = requires(const Strategy &s) {
-    { s.attempt(std::string_view{} /* name */) } -> std::same_as<class ThirdPartyTarget *>;
+    { s.attempt(std::string_view{} /* name */) } -> std::same_as<ThirdPartyTarget *>;
 };
 
 class ThirdPartyTarget : public Target
@@ -43,7 +76,7 @@ public:
     static ThirdPartyTarget *make(std::string name, const Strategies &...strategies)
     {
         static_assert(sizeof...(strategies) > 0);
-        ThirdPartyTarget *result = nullptr;
+        ThirdPartyTarget *result{};
         if (!(... || (result = strategies.attempt(name), result)))
             LOGI("Failed to make third party target");
         return result;
@@ -56,9 +89,14 @@ public:
                                     std::move(buildCmd)};
     }
 
-    Executable *assume_executable(std::string name, std::string pathRelToTptDir);
-    StaticLibrary *assume_static_library(std::string name, std::string pathRelToTptDir);
-    SharedLibrary *assume_shared_library(std::string name, std::string pathRelToTptDir);
+    Executable *assume_executable(std::string name, std::string path);
+    StaticLibrary *assume_static_library(std::string name, std::string path);
+    SharedLibrary *assume_shared_library(std::string name, std::string path);
+    HeaderOnlyLibrary *assume_ho_library(std::string name, std::string path);
+    Target *assume_target(TargetType, std::string name, std::string path);
+
+    std::pair<std::vector<Executable *>, std::vector<Library *>>
+    assume_manifest(const ThirdPartyTargetManifest &);
 
     std::string_view meta_build_cmd() const noexcept { return m_metaBuildCmd; }
     std::string_view build_cmd() const noexcept { return m_buildCmd; }
@@ -108,6 +146,25 @@ public:
     FindPackageTptStrategy(MatchingDirPred = MatchingDirPredicates::equality{});
     // clang-format on
     ThirdPartyTarget *attempt(std::string_view name) const;
+};
+
+class FindCmakePackageTptStrategy
+{
+    std::vector<Directory> m_searchDirs;
+    std::string m_findPackageArgs;
+    std::string m_buildType;
+
+public:
+    using Dependency = ThirdPartyTargetManifest;
+
+    FindCmakePackageTptStrategy(Directory searchPath, std::string findPackageArgs = {},
+                                std::string buildType = "relwithdebinfo");
+    FindCmakePackageTptStrategy(std::vector<Directory> searchPaths,
+                                std::string findPackageArgs = {},
+                                std::string buildType = "relwithdebinfo");
+    FindCmakePackageTptStrategy(std::string findPackageArgs = {},
+                                std::string buildType = "relwithdebinfo");
+    ThirdPartyTargetManifest attempt(std::string_view name, std::span<Dependency> deps = {}) const;
 };
 
 class FetchContentTptStrategy
