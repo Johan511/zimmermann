@@ -57,6 +57,8 @@ std::string to_string(const TargetType &type)
         return "StaticLibrary";
     case TargetType::SharedLibrary:
         return "SharedLibrary";
+    case TargetType::HeaderOnlyLibrary:
+        return "HeaderOnlyLibrary";
     case TargetType::ThirdPartyTarget:
         return "ThirdPartyTarget";
     case TargetType::CustomTarget:

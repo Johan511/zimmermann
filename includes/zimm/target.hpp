@@ -20,8 +20,9 @@ enum class TargetType
     Executable,
     StaticLibrary,
     SharedLibrary,
+    HeaderOnlyLibrary,
     ThirdPartyTarget,
-    CustomTarget
+    CustomTarget,
 };
 
 std::string to_string(const TargetType &);
@@ -124,7 +125,7 @@ public:
     }
 };
 
-class Library : public Target, public detail::SourcesTrait
+class Library : public Target
 {
 protected:
     Library(TargetType type, std::string name) noexcept : Target(type, std::move(name)) {}
@@ -136,7 +137,7 @@ public:
     Executable(std::string name) noexcept : Target(TargetType::Executable, std::move(name)) {}
 };
 
-class StaticLibrary : public Library
+class StaticLibrary : public Library, public detail::SourcesTrait
 {
 public:
     explicit StaticLibrary(std::string name) noexcept
@@ -145,13 +146,22 @@ public:
     }
 };
 
-class SharedLibrary : public Library
+class SharedLibrary : public Library, public detail::SourcesTrait
 {
 public:
     explicit SharedLibrary(std::string name) noexcept
         : Library(TargetType::SharedLibrary, std::move(name))
     {
         add_property(private_, CompileFlagProperty{"-fPIC"});
+    }
+};
+
+class HeaderOnlyLibrary : public Library
+{
+public:
+    explicit HeaderOnlyLibrary(std::string name) noexcept
+        : Library(TargetType::HeaderOnlyLibrary, std::move(name))
+    {
     }
 };
 
@@ -211,6 +221,11 @@ inline StaticLibrary *make_static_library(std::string name)
 inline SharedLibrary *make_shared_library(std::string name)
 {
     return new SharedLibrary{std::move(name)};
+}
+
+inline HeaderOnlyLibrary *make_header_only_library(std::string name)
+{
+    return new HeaderOnlyLibrary{std::move(name)};
 }
 
 template <CustomTargetTagConcept T>

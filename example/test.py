@@ -82,6 +82,15 @@ EXAMPLES = [
         ],
     },
     {
+        "name": "header_only",
+        "binary": "bin/header_only_demo",
+        "expected": ["Hello from header-only!"],
+        "install": [
+            "bin/header_only_demo",
+            "include/greeter.hpp",
+        ],
+    },
+    {
         "name": "third_party_target",
         "binary": "bin/tpt_demo",
         "expected": ["tpt_demo ok"],

@@ -27,6 +27,8 @@ std::string ninja_target_name(const Target &target)
         return std::format("lib{}.a", target.name());
     case TargetType::SharedLibrary:
         return std::format("lib{}.so", target.name());
+    case TargetType::HeaderOnlyLibrary:
+        return std::string{target.name()};
     case TargetType::ThirdPartyTarget:
         return std::format("{}_tpt", target.name());
     case TargetType::CustomTarget:
@@ -74,7 +76,9 @@ std::string get_link_sources(std::span<const PropertyObject> props)
     for (const auto &prop : props)
     {
         if (prop->type() != PropertyType::LinkTarget) continue;
-        oss << ninja_target_name(*static_cast<const LinkTargetProperty &>(*prop).link_lib()) << " ";
+        auto linkLib = static_cast<const LinkTargetProperty &>(*prop).link_lib();
+        if (linkLib->type() == TargetType::HeaderOnlyLibrary) continue;
+        oss << ninja_target_name(*linkLib) << " ";
     }
     return std::move(oss).str();
 }
@@ -297,6 +301,13 @@ void generate_build(Project &project)
             if (!depsEnsured) out << " | " << depList;
             out << '\n';
             out << "  ldflags = " << globalLinkFlags << " " << localLinkFlags << "\n\n";
+            break;
+        }
+        case TargetType::HeaderOnlyLibrary:
+        {
+            out << "build " << ninja_target_name(target) << ": phony";
+            if (!depList.empty()) out << " | " << depList;
+            out << "\n\n";
             break;
         }
         case TargetType::ThirdPartyTarget:
