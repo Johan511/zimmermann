@@ -19,7 +19,7 @@ class RelativePath
 public:
     // constrained so it doesn't shadow the copy/move ctors for RelativePath arguments
     template <typename P>
-        requires(!std::same_as<std::remove_cvref_t<P>, RelativePath>)
+    requires(!std::same_as<std::remove_cvref_t<P>, RelativePath>)
     RelativePath(P &&p) : m_path(std::forward<P>(p))
     {
         if (m_path.empty() || !m_path.is_relative())

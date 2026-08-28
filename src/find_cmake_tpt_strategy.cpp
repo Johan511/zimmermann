@@ -398,12 +398,19 @@ std::vector<ImportedTarget> select_targets(std::string_view name, const ParsedCm
     return {std::move(carrier)};
 }
 
+// One materializable entry: target kind, zimm name, and a path relative to the TPT
+// dir (the artifact for located targets, the include dir for header-only ones).
+struct Entry
+{
+    TargetType type;
+    std::string name;
+    std::string path;
+};
+
 // Validate one parsed CMake target and compute its manifest entry (path relative to
 // prefixDir). All skip-decisions and their diagnostics live here.
-std::optional<ThirdPartyTargetManifest::Entry> entry_of(const ImportedTarget &tgt,
-                                                        std::set<std::string> &seenNames,
-                                                        const std::string &configPath,
-                                                        const Directory &prefixDir)
+std::optional<Entry> entry_of(const ImportedTarget &tgt, std::set<std::string> &seenNames,
+                              const std::string &configPath, const Directory &prefixDir)
 {
     const std::string zimmName = strip_namespace(tgt.name);
     if (!seenNames.insert(zimmName).second)
@@ -446,12 +453,12 @@ std::optional<ThirdPartyTargetManifest::Entry> entry_of(const ImportedTarget &tg
     }
     if (rel.empty()) return std::nullopt;
 
-    return ThirdPartyTargetManifest::Entry{*zimmType, zimmName, std::move(rel)};
+    return Entry{*zimmType, zimmName, std::move(rel)};
 }
 
 struct BuildResult
 {
-    std::vector<ThirdPartyTargetManifest::Entry> entries;
+    std::vector<Entry> entries;
     std::vector<bool> accepted; // parallel to the input targets
 };
 
@@ -616,18 +623,17 @@ FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(std::string findPackage
 {
 }
 
-std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest>
-FindCmakePackageTptStrategy::attempt(std::string_view name) const
+ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view name) const
 {
     Directory scratch =
         Directory::make(std::format(".zimm_cmake_find/{}", sanitize_pkg_name(name)));
 
     auto cmakeResultOpt =
         run_cmake_wrapper(scratch, name, m_findPackageArgs, m_buildType, m_searchDirs);
-    if (!cmakeResultOpt) return {nullptr, {}};
+    if (!cmakeResultOpt) return {};
     auto cmakeResult = std::move(*cmakeResultOpt);
 
-    if (cmakeResult.config.empty()) return {nullptr, {}};
+    if (cmakeResult.config.empty()) return {};
 
     Directory prefixDir = prefix_dir(cmakeResult);
     ThirdPartyTarget *tpt = ThirdPartyTarget::make(std::string{name}, prefixDir);
@@ -635,9 +641,23 @@ FindCmakePackageTptStrategy::attempt(std::string_view name) const
     auto tgts = select_targets(name, cmakeResult);
     auto built = build_entries(tgts, cmakeResult.config, prefixDir);
 
-    ThirdPartyTargetManifest manifest{std::move(built.entries)};
-    auto [exes, libs] = tpt->assume_manifest(manifest);
+    // Materialize the accepted entries under the TPT (manifest paths are always
+    // relative to the tpt dir), split them for wire_usage, and report them in the
+    // returned manifest.
+    std::vector<Target *> assumed;
+    std::vector<Executable *> exes;
+    std::vector<Library *> libs;
+    for (const auto &entry : built.entries)
+    {
+        Target *target =
+            tpt->assume_target(entry.type, entry.name, detail::RelativePath{entry.path});
+        assumed.push_back(target);
+        if (target->type() == TargetType::Executable)
+            exes.push_back(static_cast<Executable *>(target));
+        else libs.push_back(static_cast<Library *>(target));
+    }
+
     wire_usage(tgts, built, exes, libs, cmakeResult.config);
-    return {tpt, std::move(manifest)};
+    return {tpt, std::move(assumed)};
 }
 } // namespace zimm

@@ -1,4 +1,5 @@
 #include "zimm/third_party_target.hpp"
+#include <ranges>
 
 namespace zimm
 {
@@ -22,8 +23,7 @@ FindPackageTptStrategy::FindPackageTptStrategy(MatchingDirPred matchingDir)
 {
 }
 
-std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest>
-FindPackageTptStrategy::attempt(std::string_view name) const
+ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
 {
     namespace fs = std::filesystem;
 
@@ -33,7 +33,7 @@ FindPackageTptStrategy::attempt(std::string_view name) const
         if (!fs::is_directory(path)) continue;
 
         if (m_matchingDir(searchDir.dir_name(), name))
-            return {ThirdPartyTarget::make(std::string{name}, searchDir), {}};
+            return ThirdPartyTarget::make(std::string{name}, searchDir);
 
         using fs::directory_options::skip_permission_denied;
         // TODO: do we need follow_directory_symlink?
@@ -43,13 +43,13 @@ FindPackageTptStrategy::attempt(std::string_view name) const
             if (!child.is_directory()) continue;
             const fs::path &childPath = child.path();
             if (m_matchingDir(childPath.filename().c_str(), name))
-                return {
-                    ThirdPartyTarget::make(std::string{name}, Directory::make(childPath.string())),
-                    {}};
+
+                return ThirdPartyTarget::make(std::string{name},
+                                              Directory::make(childPath.string()));
         }
     }
-    return {nullptr, {}};
-}
+    return nullptr;
+};
 
 FetchContentTptStrategy::FetchContentTptStrategy(Directory dir, std::string fetchContentCmd,
                                                  MetaBuildCmd metaBuildCmd, BuildCmd buildCmd)
@@ -58,8 +58,7 @@ FetchContentTptStrategy::FetchContentTptStrategy(Directory dir, std::string fetc
 {
 }
 
-std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest>
-FetchContentTptStrategy::attempt(std::string_view name) const
+ThirdPartyTarget *FetchContentTptStrategy::attempt(std::string_view name) const
 {
     namespace fs = std::filesystem;
 
@@ -69,9 +68,8 @@ FetchContentTptStrategy::attempt(std::string_view name) const
     MetaBuildCmd fetchAndMetaBuild =
         MetaBuildCmd{std::format("cd {} && {} && {}", m_dir.path().string(),
                                  std::move(fetchContentCmd), std::move(metaBuildCmd))};
-    return {
-        ThirdPartyTarget::make(std::string{name}, m_dir, std::move(fetchAndMetaBuild), m_buildCmd),
-        {}};
+    return ThirdPartyTarget::make(std::string{name}, m_dir, std::move(fetchAndMetaBuild),
+                                  m_buildCmd);
 }
 
 ThirdPartyTarget::ThirdPartyTarget(std::string name, Directory dir, MetaBuildCmd metaBuildCmd,
@@ -138,47 +136,35 @@ Target *ThirdPartyTarget::assume_target(TargetType type, std::string name,
     }
 }
 
-std::pair<std::vector<Executable *>, std::vector<Library *>>
-ThirdPartyTarget::assume_manifest(const ThirdPartyTargetManifest &manifest)
+template <typename T>
+std::vector<T *> filter(std::span<Target *> targets, TargetType type, std::string name)
 {
-    std::vector<Executable *> exes;
-    std::vector<Library *> libs;
-
-    for (const auto &[type, name, path] : manifest.entries())
-    {
-        // manifest paths are always relative to the tpt dir
-        Target *target = assume_target(type, name, detail::RelativePath{path});
-        if (!target) continue;
-        if (target->type() == TargetType::Executable)
-            exes.push_back(static_cast<Executable *>(target));
-        else libs.push_back(static_cast<Library *>(target));
-    }
-    return {std::move(exes), std::move(libs)};
+    return targets |
+           std::views::filter(
+               [&](const Target *t)
+               {
+                   if (t->type() != type) return false;
+                   return name.empty() || t->name() == name;
+               }) |
+           std::views::transform([](Target *t) { return static_cast<T *>(t); }) |
+           std::ranges::to<std::vector>();
 }
 
-std::vector<ThirdPartyTargetManifest::Entry> ThirdPartyTargetManifest::type(TargetType type) const
-    noexcept
+std::vector<StaticLibrary *> ThirdPartyTargetManifest::static_libs(std::string name)
 {
-    std::vector<Entry> result;
-    for (const auto &entry : m_manifest)
-        if (std::get<0>(entry) == type) result.push_back(entry);
-    return result;
+    return filter<StaticLibrary>(m_assumed, TargetType::StaticLibrary, std::move(name));
 }
-
-std::optional<ThirdPartyTargetManifest::Entry>
-ThirdPartyTargetManifest::name(std::string_view name) const noexcept
+std::vector<SharedLibrary *> ThirdPartyTargetManifest::shared_libs(std::string name)
 {
-    for (const auto &entry : m_manifest)
-        if (std::get<1>(entry) == name) return entry;
-    return std::nullopt;
+    return filter<SharedLibrary>(m_assumed, TargetType::SharedLibrary, std::move(name));
 }
-
-std::optional<ThirdPartyTargetManifest::Entry> ThirdPartyTargetManifest::name(
-    std::function<bool(std::string_view, std::string_view)> nameMatchingFunction) const noexcept
+std::vector<HeaderOnlyLibrary *> ThirdPartyTargetManifest::ho_libs(std::string name)
 {
-    for (const auto &entry : m_manifest)
-        if (nameMatchingFunction(std::get<1>(entry), std::get<2>(entry))) return entry;
-    return std::nullopt;
+    return filter<HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary, std::move(name));
+}
+std::vector<Executable *> ThirdPartyTargetManifest::execs(std::string name)
+{
+    return filter<Executable>(m_assumed, TargetType::Executable, std::move(name));
 }
 
 } // namespace zimm

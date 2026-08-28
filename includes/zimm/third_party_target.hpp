@@ -26,36 +26,27 @@ struct MetaBuildCmd
 
 class ThirdPartyTargetManifest
 {
-public:
-    // name: verbatim CMake target name (may contain "::")
-    // file / dir: ALWAYS relative to the ThirdPartyTarget's dir — for located targets the
-    //             artifact path, for header-only targets their include dir (non-empty).
-    using Entry = std::tuple<TargetType, std::string /*name*/, std::string /* file / dir */>;
-
-private:
-    std::vector<Entry> m_manifest;
+    ThirdPartyTarget *m_tpt = nullptr;
+    std::vector<Target *> m_assumed;
 
 public:
     ThirdPartyTargetManifest() = default;
-    explicit ThirdPartyTargetManifest(std::vector<Entry> manifest) : m_manifest(std::move(manifest))
+    ThirdPartyTargetManifest(ThirdPartyTarget *tpt, std::vector<Target *> assumed)
+        : m_tpt(tpt), m_assumed(std::move(assumed))
     {
     }
 
-    std::span<const Entry> entries() const noexcept { return m_manifest; }
-
-    std::vector<Entry> type(TargetType type) const noexcept;
-    std::optional<Entry> name(std::string_view name) const noexcept;
-    std::optional<Entry>
-    name(std::function<bool(std::string_view, std::string_view)> /* name matching function */)
-        const noexcept;
+    ThirdPartyTarget *tpt() { return m_tpt; }
+    std::vector<StaticLibrary *> static_libs(std::string name = "");
+    std::vector<SharedLibrary *> shared_libs(std::string name = "");
+    std::vector<HeaderOnlyLibrary *> ho_libs(std::string name = "");
+    std::vector<Executable *> execs(std::string name = "");
 };
 
 class ThirdPartyTarget;
 template <typename Strategy>
 concept ThirdPartyTargetStrategy = requires(const Strategy &s) {
-    {
-        s.attempt(std::string_view{} /* name */)
-    } -> std::same_as<std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest>>;
+    { s.attempt(std::string_view{} /* name */) } -> std::same_as<ThirdPartyTarget *>;
 };
 
 class ThirdPartyTarget : public Target
@@ -69,12 +60,11 @@ class ThirdPartyTarget : public Target
 
 public:
     template <ThirdPartyTargetStrategy... Strategies>
-    static std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest>
-    make(std::string name, const Strategies &...strategies)
+    static ThirdPartyTarget *make(std::string name, const Strategies &...strategies)
     {
         static_assert(sizeof...(strategies) > 0);
-        std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest> result{};
-        if (!(... || (result = strategies.attempt(name), result.first)))
+        ThirdPartyTarget *result{};
+        if (!(... || (result = strategies.attempt(name), result)))
             LOGI("Failed to make third party target");
         return result;
     }
@@ -142,14 +132,14 @@ public:
     FindPackageTptStrategy(std::vector<Directory> searchPaths, MatchingDirPred = MatchingDirPredicates::equality{});
     FindPackageTptStrategy(MatchingDirPred = MatchingDirPredicates::equality{});
     // clang-format on
-    std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest> attempt(std::string_view name) const;
+    ThirdPartyTarget *attempt(std::string_view name) const;
 };
 
 class FindCmakePackageTptStrategy
 {
-    std::vector<Directory> m_searchDirs; // empty default → omit CMAKE_PREFIX_PATH (CMake's own defaults)
-    std::string m_findPackageArgs;      // e.g. "1.2 COMPONENTS foo", appended after "CONFIG REQUIRED"
-    std::string m_buildType;            // zimm-style, default "relwithdebinfo" (matches Config::build_type)
+    std::vector<Directory> m_searchDirs;
+    std::string m_findPackageArgs;
+    std::string m_buildType;
 
 public:
     // clang-format off
@@ -157,7 +147,7 @@ public:
     FindCmakePackageTptStrategy(std::vector<Directory> searchPaths, std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo");
     FindCmakePackageTptStrategy(std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo");
     // clang-format on
-    std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest> attempt(std::string_view name) const;
+    ThirdPartyTargetManifest attempt(std::string_view name) const;
 };
 
 class FetchContentTptStrategy
@@ -170,12 +160,11 @@ class FetchContentTptStrategy
 public:
     FetchContentTptStrategy(Directory dir, std::string fetchContentCmd, MetaBuildCmd metaBuildCmd,
                             BuildCmd buildCmd);
-    std::pair<ThirdPartyTarget *, ThirdPartyTargetManifest> attempt(std::string_view name) const;
+    ThirdPartyTarget *attempt(std::string_view name) const;
 };
 
 static_assert(ThirdPartyTargetStrategy<FindPackageTptStrategy>);
 static_assert(ThirdPartyTargetStrategy<FetchContentTptStrategy>);
-static_assert(ThirdPartyTargetStrategy<FindCmakePackageTptStrategy>);
 
 inline std::string git_fetch(const Directory &dir, std::string_view url, std::string_view id)
 {

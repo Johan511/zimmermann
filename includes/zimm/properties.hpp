@@ -80,7 +80,7 @@ namespace detail
 {
 class LinkTrait;
 class SourcesTrait;
-}
+} // namespace detail
 
 class LinkTargetProperty : public Property
 {
