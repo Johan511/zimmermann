@@ -1,3 +1,4 @@
 build*/
 install*/
 _zimm_workspace/
+zimm_testing/*/from_docker
