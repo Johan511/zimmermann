@@ -137,13 +137,13 @@ Target *ThirdPartyTarget::assume_target(TargetType type, std::string name,
 }
 
 template <typename T>
-std::vector<T *> filter(std::span<Target *> targets, TargetType type, std::string name)
+std::vector<T *> filter(auto &targets, std::optional<TargetType> type, std::string name)
 {
     return targets |
            std::views::filter(
                [&](const Target *t)
                {
-                   if (t->type() != type) return false;
+                   if (type && t->type() != *type) return false;
                    return name.empty() || t->name() == name;
                }) |
            std::views::transform([](Target *t) { return static_cast<T *>(t); }) |
@@ -167,4 +167,34 @@ std::vector<Executable *> ThirdPartyTargetManifest::execs(std::string name)
     return filter<Executable>(m_assumed, TargetType::Executable, std::move(name));
 }
 
+std::vector<Target *> ThirdPartyTargetManifest::targets(std::string name)
+{
+    return filter<Target>(m_assumed, std::nullopt, std::move(name));
+}
+
+std::vector<const StaticLibrary *> ThirdPartyTargetManifest::static_libs(std::string name) const
+{
+    return filter<const StaticLibrary>(m_assumed, TargetType::StaticLibrary, std::move(name));
+}
+
+std::vector<const SharedLibrary *> ThirdPartyTargetManifest::shared_libs(std::string name) const
+{
+    return filter<const SharedLibrary>(m_assumed, TargetType::SharedLibrary, std::move(name));
+}
+
+std::vector<const HeaderOnlyLibrary *> ThirdPartyTargetManifest::ho_libs(std::string name) const
+{
+    return filter<const HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary,
+                                           std::move(name));
+}
+
+std::vector<const Executable *> ThirdPartyTargetManifest::execs(std::string name) const
+{
+    return filter<const Executable>(m_assumed, TargetType::Executable, std::move(name));
+}
+
+std::vector<const Target *> ThirdPartyTargetManifest::targets(std::string name) const
+{
+    return filter<const Target>(m_assumed, std::nullopt, std::move(name));
+}
 } // namespace zimm

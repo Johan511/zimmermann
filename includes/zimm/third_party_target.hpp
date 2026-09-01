@@ -37,10 +37,22 @@ public:
     }
 
     ThirdPartyTarget *tpt() { return m_tpt; }
+    const ThirdPartyTarget *tpt() const { return m_tpt; }
+
     std::vector<StaticLibrary *> static_libs(std::string name = "");
+    std::vector<const StaticLibrary *> static_libs(std::string name = "") const;
+
     std::vector<SharedLibrary *> shared_libs(std::string name = "");
+    std::vector<const SharedLibrary *> shared_libs(std::string name = "") const;
+
     std::vector<HeaderOnlyLibrary *> ho_libs(std::string name = "");
+    std::vector<const HeaderOnlyLibrary *> ho_libs(std::string name = "") const;
+
     std::vector<Executable *> execs(std::string name = "");
+    std::vector<const Executable *> execs(std::string name = "") const;
+
+    std::vector<Target *> targets(std::string name = "");
+    std::vector<const Target *> targets(std::string name = "") const;
 };
 
 class ThirdPartyTarget;
