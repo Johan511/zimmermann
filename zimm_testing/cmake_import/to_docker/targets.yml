@@ -1,0 +1,422 @@
+packages:
+  fmt:
+    targets:
+      SharedLibrary: [fmt]
+      HeaderOnlyLibrary: [fmt-header-only]
+  spdlog:
+    targets:
+      HeaderOnlyLibrary: [Threads, fmt-header-only, spdlog_header_only]
+      SharedLibrary: [fmt, spdlog]
+  GTest:
+    targets:
+      HeaderOnlyLibrary: [Threads]
+      SharedLibrary: [gtest, gtest_main, gmock, gmock_main]
+  Catch2:
+    targets:
+      HeaderOnlyLibrary: [Catch2]
+  benchmark:
+    targets:
+      HeaderOnlyLibrary: [Threads]
+      SharedLibrary: [benchmark, benchmark_main]
+  Eigen3:
+    targets:
+      HeaderOnlyLibrary: [Eigen]
+  glm:
+    targets:
+      HeaderOnlyLibrary: [glm-header-only, glm]
+  Boost:
+    args: "COMPONENTS program_options"
+    targets:
+      HeaderOnlyLibrary: [headers, boost, diagnostic_definitions, disable_autolinking,
+        dynamic_linking]
+      SharedLibrary: [program_options, container]
+  FlatBuffers:
+    targets:
+      Executable: [flatc]
+      SharedLibrary: [flatbuffers_shared]
+  absl:
+    targets:
+      HeaderOnlyLibrary: [Threads, atomic_hook, errno_saver, no_destructor, nullability,
+        nullability_traits_internal, config, dynamic_annotations, core_headers, base_internal,
+        exception_testing, pretty_function, endian, fast_type_id, prefetch, iterator_traits_internal,
+        iterator_traits_test_helper_internal, algorithm, algorithm_container, cleanup_internal,
+        cleanup, btree, btree_test_common, compressed_tuple, fixed_array, inlined_vector_internal,
+        inlined_vector, test_allocator, flat_hash_map, flat_hash_set, node_hash_map,
+        node_hash_set, hash_container_defaults, container_memory, hash_function_defaults,
+        hash_policy_testing, hash_policy_traits, common_policy_traits, hashtable_debug,
+        hashtable_debug_hooks, node_slot_policy, raw_hash_map, container_common, hashtable_control_bytes,
+        raw_hash_set_resize_impl, layout, tracked, unordered_map_constructor_test,
+        unordered_map_lookup_test, unordered_map_members_test, unordered_map_modifiers_test,
+        unordered_set_constructor_test, unordered_set_lookup_test, unordered_set_members_test,
+        unordered_set_modifiers_test, heterogeneous_lookup_testing, linked_hash_set,
+        linked_hash_map, chunked_queue, non_temporal_arm_intrinsics, non_temporal_memcpy,
+        bounded_utf8_length_sequence, debugging, flags_path_util, flags, any_invocable,
+        bind_front, function_ref, overload, hash_testing, spy_hash_state, weakly_mixed_integer,
+        log_internal_check_impl, log_internal_config, log_internal_flags, log_internal_log_impl,
+        log_internal_nullstream, log_internal_strip, log_internal_voidify, log_internal_append_truncated,
+        absl_check, absl_log, check, log, log_sink_registry, log_streamer, log_internal_structured,
+        log_structured, absl_vlog_is_on, vlog_is_on, log_internal_container, memory,
+        constexpr_testing_internal, requires_internal, type_traits, meta, bits, numeric,
+        numeric_representation, sample_recorder, random_random, random_bit_gen_ref,
+        random_internal_mock_helpers, random_internal_mock_overload_set, random_mocking_bit_gen,
+        random_internal_traits, random_internal_distribution_caller, random_internal_fast_uniform_bits,
+        random_internal_explicit_seed_seq, random_internal_sequence_urbg, random_internal_salted_seed_seq,
+        random_internal_iostream_state_saver, random_internal_generate_real, random_internal_wide_multiply,
+        random_internal_fastmath, random_internal_nonsecure_base, random_internal_pcg_engine,
+        random_internal_randen_engine, random_internal_uniform_helper, random_internal_mock_validators,
+        string_view, charset, has_ostream_operator, strings_resize_and_overwrite,
+        strings_append_and_overwrite, str_format, cordz_update_tracker, cordz_statistics,
+        cordz_update_scope, cord_rep_test_util, cord_test_helpers, cordz_test_helpers,
+        thread_pool, any, span, optional, variant, compare, bad_any_cast, bad_optional_access,
+        bad_variant_access, utility]
+      SharedLibrary: [log_severity, raw_logging_internal, spinlock_wait, malloc_internal,
+        base, throw_delegate, exception_safety_testing, atomic_hook_test_helper, spinlock_test_common,
+        scoped_set_env, strerror, poison, tracing_internal, test_instance_tracker,
+        hash_generator_testing, hashtablez_sampler, raw_hash_set, crc_cpu_detect,
+        crc_internal, crc32c, crc_cord_state, borrowed_fixup_buffer, stacktrace, symbolize,
+        examine_stack, failure_signal_handler, debugging_internal, demangle_internal,
+        decode_rust_punycode, demangle_rust, utf8_for_code_point, leak_check, stack_consumption,
+        flags_program_name, flags_config, flags_marshalling, flags_commandlineflag_internal,
+        flags_commandlineflag, flags_private_handle_accessor, flags_reflection, flags_internal,
+        flags_usage_internal, flags_usage, flags_parse, hash, city, log_internal_check_op,
+        log_internal_conditions, log_internal_format, log_internal_globals, log_internal_proto,
+        log_internal_message, log_internal_log_sink_set, log_internal_nullguard, log_internal_test_actions,
+        log_internal_test_helpers, log_internal_test_matchers, die_if_null, log_flags,
+        log_globals, log_initialize, log_entry, log_sink, scoped_mock_log, log_internal_structured_proto,
+        vlog_config_internal, log_internal_fnmatch, int128, exponential_biased, periodic_sampler,
+        profile_builder, hashtable_profiler, random_distributions, random_seed_gen_exception,
+        random_seed_sequences, random_internal_seed_material, random_internal_entropy_pool,
+        random_internal_platform, random_internal_randen, random_internal_randen_slow,
+        random_internal_randen_hwaes, random_internal_randen_hwaes_impl, random_internal_distribution_test_util,
+        status, statusor, status_matchers, strings, strings_internal, str_format_internal,
+        pow10_helper, cord_internal, cordz_functions, cordz_handle, cordz_info, cordz_sample_token,
+        cord, generic_printer_internal, graphcycles_internal, kernel_timeout_internal,
+        synchronization, per_thread_sem_test_common, time, civil_time, time_zone,
+        time_internal_test_util]
+    deps: [{ns: GTest, pkg: GTest}]
+  gRPC:
+    targets:
+      SharedLibrary: [ZLIB, libprotobuf, libprotoc, Crypto, SSL, cares, log_severity,
+        raw_logging_internal, spinlock_wait, malloc_internal, base, throw_delegate,
+        exception_safety_testing, atomic_hook_test_helper, spinlock_test_common, scoped_set_env,
+        strerror, poison, tracing_internal, test_instance_tracker, hash_generator_testing,
+        hashtablez_sampler, raw_hash_set, crc_cpu_detect, crc_internal, crc32c, crc_cord_state,
+        borrowed_fixup_buffer, stacktrace, symbolize, examine_stack, failure_signal_handler,
+        debugging_internal, demangle_internal, decode_rust_punycode, demangle_rust,
+        utf8_for_code_point, leak_check, stack_consumption, flags_program_name, flags_config,
+        flags_marshalling, flags_commandlineflag_internal, flags_commandlineflag,
+        flags_private_handle_accessor, flags_reflection, flags_internal, flags_usage_internal,
+        flags_usage, flags_parse, hash, city, log_internal_check_op, log_internal_conditions,
+        log_internal_format, log_internal_globals, log_internal_proto, log_internal_message,
+        log_internal_log_sink_set, log_internal_nullguard, log_internal_test_actions,
+        log_internal_test_helpers, log_internal_test_matchers, die_if_null, log_flags,
+        log_globals, log_initialize, log_entry, log_sink, scoped_mock_log, log_internal_structured_proto,
+        vlog_config_internal, log_internal_fnmatch, int128, exponential_biased, periodic_sampler,
+        profile_builder, hashtable_profiler, random_distributions, random_seed_gen_exception,
+        random_seed_sequences, random_internal_seed_material, random_internal_entropy_pool,
+        random_internal_platform, random_internal_randen, random_internal_randen_slow,
+        random_internal_randen_hwaes, random_internal_randen_hwaes_impl, random_internal_distribution_test_util,
+        status, statusor, status_matchers, strings, strings_internal, str_format_internal,
+        pow10_helper, cord_internal, cordz_functions, cordz_handle, cordz_info, cordz_sample_token,
+        cord, generic_printer_internal, graphcycles_internal, kernel_timeout_internal,
+        synchronization, per_thread_sem_test_common, time, civil_time, time_zone,
+        time_internal_test_util, uc, re2, address_sorting, gpr, grpc, grpc_unsecure,
+        grpc++, grpc++_alts, grpc++_error_details, grpc++_reflection, grpc++_unsecure,
+        grpc_plugin_support, grpcpp_channelz, upb]
+      HeaderOnlyLibrary: [Threads, applink, cares_shared, atomic_hook, errno_saver,
+        no_destructor, nullability, nullability_traits_internal, config, dynamic_annotations,
+        core_headers, base_internal, exception_testing, pretty_function, endian, fast_type_id,
+        prefetch, iterator_traits_internal, iterator_traits_test_helper_internal,
+        algorithm, algorithm_container, cleanup_internal, cleanup, btree, btree_test_common,
+        compressed_tuple, fixed_array, inlined_vector_internal, inlined_vector, test_allocator,
+        flat_hash_map, flat_hash_set, node_hash_map, node_hash_set, hash_container_defaults,
+        container_memory, hash_function_defaults, hash_policy_testing, hash_policy_traits,
+        common_policy_traits, hashtable_debug, hashtable_debug_hooks, node_slot_policy,
+        raw_hash_map, container_common, hashtable_control_bytes, raw_hash_set_resize_impl,
+        layout, tracked, unordered_map_constructor_test, unordered_map_lookup_test,
+        unordered_map_members_test, unordered_map_modifiers_test, unordered_set_constructor_test,
+        unordered_set_lookup_test, unordered_set_members_test, unordered_set_modifiers_test,
+        heterogeneous_lookup_testing, linked_hash_set, linked_hash_map, chunked_queue,
+        non_temporal_arm_intrinsics, non_temporal_memcpy, bounded_utf8_length_sequence,
+        debugging, flags_path_util, flags, any_invocable, bind_front, function_ref,
+        overload, hash_testing, spy_hash_state, weakly_mixed_integer, log_internal_check_impl,
+        log_internal_config, log_internal_flags, log_internal_log_impl, log_internal_nullstream,
+        log_internal_strip, log_internal_voidify, log_internal_append_truncated, absl_check,
+        absl_log, check, log, log_sink_registry, log_streamer, log_internal_structured,
+        log_structured, absl_vlog_is_on, vlog_is_on, log_internal_container, memory,
+        constexpr_testing_internal, requires_internal, type_traits, meta, bits, numeric,
+        numeric_representation, sample_recorder, random_random, random_bit_gen_ref,
+        random_internal_mock_helpers, random_internal_mock_overload_set, random_mocking_bit_gen,
+        random_internal_traits, random_internal_distribution_caller, random_internal_fast_uniform_bits,
+        random_internal_explicit_seed_seq, random_internal_sequence_urbg, random_internal_salted_seed_seq,
+        random_internal_iostream_state_saver, random_internal_generate_real, random_internal_wide_multiply,
+        random_internal_fastmath, random_internal_nonsecure_base, random_internal_pcg_engine,
+        random_internal_randen_engine, random_internal_uniform_helper, random_internal_mock_validators,
+        string_view, charset, has_ostream_operator, strings_resize_and_overwrite,
+        strings_append_and_overwrite, str_format, cordz_update_tracker, cordz_statistics,
+        cordz_update_scope, cord_rep_test_util, cord_test_helpers, cordz_test_helpers,
+        thread_pool, any, span, optional, variant, compare, bad_any_cast, bad_optional_access,
+        bad_variant_access, utility]
+      Executable: [protoc, grpc_cpp_plugin, grpc_csharp_plugin, grpc_node_plugin,
+        grpc_objective_c_plugin, grpc_php_plugin, grpc_python_plugin, grpc_ruby_plugin]
+    deps: [{ns: GTest, pkg: GTest}]
+  SFML:
+    args: "COMPONENTS window"
+    targets:
+      SharedLibrary: [sfml-system, sfml-window, sfml-network, sfml-graphics, sfml-audio]
+      HeaderOnlyLibrary: [X11, OpenGL, UDev, Freetype, VORBIS, FLAC]
+  glfw3:
+    targets:
+      HeaderOnlyLibrary: [Threads]
+      SharedLibrary: [glfw]
+  raylib:
+    targets:
+      SharedLibrary: [raylib]
+  box2d:
+    targets:
+      SharedLibrary: [box2d]
+  Qt6:
+    args: "COMPONENTS Core"
+    targets:
+      HeaderOnlyLibrary: [Platform, GlobalConfig, GlobalConfigPrivate, PlatformCommonInternal,
+        PlatformModuleInternal, PlatformPluginInternal, PlatformAppInternal, PlatformToolInternal,
+        PlatformExampleInternal, Threads, WrapAtomic]
+      Executable: [syncqt, moc, rcc, tracepointgen, tracegen, cmake_automoc_parser,
+        qlalr, qtpaths, androiddeployqt, androidtestrunner, wasmdeployqt, qmake]
+      SharedLibrary: [Core]
+  OpenCV:
+    targets:
+      SharedLibrary: [opencv_core, opencv_flann, opencv_hdf, opencv_imgproc, opencv_intensity_transform,
+        opencv_ml, opencv_phase_unwrapping, opencv_photo, opencv_plot, opencv_quality,
+        opencv_reg, opencv_signal, opencv_surface_matching, opencv_viz, opencv_xphoto,
+        opencv_alphamat, opencv_dnn, opencv_dnn_superres, opencv_features2d, opencv_freetype,
+        opencv_fuzzy, opencv_hfs, opencv_img_hash, opencv_imgcodecs, opencv_line_descriptor,
+        opencv_saliency, opencv_text, opencv_videoio, opencv_calib3d, opencv_cvv,
+        opencv_datasets, opencv_highgui, opencv_mcc, opencv_objdetect, opencv_rapid,
+        opencv_rgbd, opencv_shape, opencv_stitching, opencv_structured_light, opencv_video,
+        opencv_videostab, opencv_wechat_qrcode, opencv_ximgproc, opencv_xobjdetect,
+        opencv_aruco, opencv_bgsegm, opencv_bioinspired, opencv_ccalib, opencv_dnn_objdetect,
+        opencv_dpm, opencv_face, opencv_gapi, opencv_optflow, opencv_superres, opencv_tracking,
+        opencv_stereo]
+  Poco:
+    args: "COMPONENTS Foundation Net"
+    targets:
+      SharedLibrary: [ZLIB, Pcre2, Utf8Proc, Foundation, Net]
+  TBB:
+    targets:
+      SharedLibrary: [tbb, tbbmalloc, tbbmalloc_proxy, tbbbind_2_5, irml]
+    deps: [{ns: PkgConfig, pkg: hwloc}]
+  LLVM:
+    targets:
+      SharedLibrary: [ffi, ZLIB, libzstd_shared, LibXml2, LTO, LLVMgold, LLVM, Remarks]
+      HeaderOnlyLibrary: [LibEdit]
+      Executable: [xmllint, llvm-tblgen, FileCheck, llvm-PerfectShuffle, count, not,
+        UnicodeNameMappingGenerator, yaml-bench, split-file, llvm-test-mustache-spec,
+        llvm-ar, llvm-config, llvm-ctxprof-util, llvm-lto, llvm-profdata, bugpoint,
+        dsymutil, llc, lli-child-target, lli, llvm-as, llvm-bcanalyzer, llvm-c-test,
+        llvm-cas, llvm-cat, llvm-cfi-verify, llvm-cgdata, llvm-cov, llvm-cvtres, llvm-cxxdump,
+        llvm-cxxfilt, llvm-cxxmap, llvm-debuginfo-analyzer, llvm-debuginfod, llvm-debuginfod-find,
+        llvm-diff, llvm-dis, llvm-dwarfdump, llvm-dwarfutil, llvm-dwp, llvm-exegesis,
+        llvm-extract, llvm-gsymutil, llvm-ifs, llvm-ir2vec, llvm-jitlink-executor,
+        llvm-jitlink, llvm-libtool-darwin, llvm-link, llvm-lipo, llvm-lto2, llvm-mc,
+        llvm-mca, llvm-ml, llvm-modextract, llvm-mt, llvm-nm, llvm-objcopy, llvm-objdump,
+        llvm-offload-binary, llvm-offload-wrapper, llvm-opt-report, llvm-pdbutil,
+        llvm-profgen, llvm-rc, llvm-readobj, llvm-readtapi, llvm-reduce, llvm-remarkutil,
+        llvm-rtdyld, llvm-sim, llvm-size, llvm-split, llvm-stress, llvm-strings, llvm-symbolizer,
+        llvm-tli-checker, llvm-undname, llvm-xray, obj2yaml, opt, reduce-chunk-list,
+        sancov, sanstats, verify-uselistorder, yaml2obj]
+      StaticLibrary: [LLVMDemangle, LLVMSupportLSP, LLVMSupport, LLVMTableGen, LLVMTableGenBasic,
+        LLVMTableGenCommon, LLVMABI, LLVMCore, LLVMFuzzerCLI, LLVMFuzzMutate, LLVMFileCheck,
+        LLVMInterfaceStub, LLVMIRPrinter, LLVMIRReader, LLVMCAS, LLVMCGData, LLVMCodeGen,
+        LLVMSelectionDAG, LLVMAsmPrinter, LLVMMIRParser, LLVMGlobalISel, LLVMCodeGenTypes,
+        LLVMBinaryFormat, LLVMBitReader, LLVMBitWriter, LLVMBitstreamReader, LLVMDWARFLinker,
+        LLVMDWARFLinkerClassic, LLVMDWARFLinkerParallel, LLVMExtensions, LLVMFrontendAtomic,
+        LLVMFrontendDirective, LLVMFrontendDriver, LLVMFrontendHLSL, LLVMFrontendOpenACC,
+        LLVMFrontendOpenMP, LLVMFrontendOffloading, LLVMTransformUtils, LLVMInstrumentation,
+        LLVMAggressiveInstCombine, LLVMInstCombine, LLVMScalarOpts, LLVMipo, LLVMVectorize,
+        LLVMObjCARCOpts, LLVMCoroutines, LLVMCFGuard, LLVMHipStdPar, LLVMLinker, LLVMAnalysis,
+        LLVMDTLTO, LLVMLTO, LLVMMC, LLVMMCParser, LLVMMCDisassembler, LLVMMCA, LLVMObjCopy,
+        LLVMObject, LLVMObjectYAML, LLVMOption, LLVMRemarks, LLVMDebuginfod, LLVMDebugInfoDWARFLowLevel,
+        LLVMDebugInfoDWARF, LLVMDebugInfoGSYM, LLVMDebugInfoLogicalView, LLVMDebugInfoMSF,
+        LLVMDebugInfoCodeView, LLVMDebugInfoPDB, LLVMSymbolize, LLVMDebugInfoBTF,
+        LLVMDWARFCFIChecker, LLVMDWP, LLVMExecutionEngine, LLVMInterpreter, LLVMJITLink,
+        LLVMMCJIT, LLVMOrcJIT, LLVMOrcDebugging, LLVMOrcShared, LLVMOrcTargetProcess,
+        LLVMRuntimeDyld, LLVMPerfJITEvents, LLVMTarget, LLVMAArch64CodeGen, LLVMAArch64AsmParser,
+        LLVMAArch64Disassembler, LLVMAArch64Desc, LLVMAArch64Info, LLVMAArch64Utils,
+        LLVMAMDGPUCodeGen, LLVMAMDGPUAsmParser, LLVMAMDGPUDisassembler, LLVMAMDGPUTargetMCA,
+        LLVMAMDGPUDesc, LLVMAMDGPUInfo, LLVMAMDGPUUtils, LLVMARMCodeGen, LLVMARMAsmParser,
+        LLVMARMDisassembler, LLVMARMDesc, LLVMARMInfo, LLVMARMUtils, LLVMAVRCodeGen,
+        LLVMAVRAsmParser, LLVMAVRDisassembler, LLVMAVRDesc, LLVMAVRInfo, LLVMBPFCodeGen,
+        LLVMBPFAsmParser, LLVMBPFDisassembler, LLVMBPFDesc, LLVMBPFInfo, LLVMHexagonCodeGen,
+        LLVMHexagonAsmParser, LLVMHexagonDisassembler, LLVMHexagonDesc, LLVMHexagonInfo,
+        LLVMLanaiCodeGen, LLVMLanaiAsmParser, LLVMLanaiDisassembler, LLVMLanaiDesc,
+        LLVMLanaiInfo, LLVMLoongArchCodeGen, LLVMLoongArchAsmParser, LLVMLoongArchDisassembler,
+        LLVMLoongArchDesc, LLVMLoongArchInfo, LLVMMipsCodeGen, LLVMMipsAsmParser,
+        LLVMMipsDisassembler, LLVMMipsDesc, LLVMMipsInfo, LLVMMSP430CodeGen, LLVMMSP430Desc,
+        LLVMMSP430Info, LLVMMSP430AsmParser, LLVMMSP430Disassembler, LLVMNVPTXCodeGen,
+        LLVMNVPTXDesc, LLVMNVPTXInfo, LLVMPowerPCCodeGen, LLVMPowerPCAsmParser, LLVMPowerPCDisassembler,
+        LLVMPowerPCDesc, LLVMPowerPCInfo, LLVMRISCVCodeGen, LLVMRISCVAsmParser, LLVMRISCVDisassembler,
+        LLVMRISCVDesc, LLVMRISCVTargetMCA, LLVMRISCVInfo, LLVMSparcCodeGen, LLVMSparcAsmParser,
+        LLVMSparcDisassembler, LLVMSparcDesc, LLVMSparcInfo, LLVMSPIRVCodeGen, LLVMSPIRVDesc,
+        LLVMSPIRVInfo, LLVMSPIRVAnalysis, LLVMSystemZCodeGen, LLVMSystemZAsmParser,
+        LLVMSystemZDisassembler, LLVMSystemZDesc, LLVMSystemZInfo, LLVMVECodeGen,
+        LLVMVEAsmParser, LLVMVEDisassembler, LLVMVEInfo, LLVMVEDesc, LLVMWebAssemblyCodeGen,
+        LLVMWebAssemblyAsmParser, LLVMWebAssemblyDisassembler, LLVMWebAssemblyDesc,
+        LLVMWebAssemblyInfo, LLVMWebAssemblyUtils, LLVMX86CodeGen, LLVMX86AsmParser,
+        LLVMX86Disassembler, LLVMX86TargetMCA, LLVMX86Desc, LLVMX86Info, LLVMXCoreCodeGen,
+        LLVMXCoreDisassembler, LLVMXCoreDesc, LLVMXCoreInfo, LLVMSandboxIR, LLVMAsmParser,
+        LLVMLineEditor, LLVMProfileData, LLVMCoverage, LLVMPasses, LLVMPlugins, LLVMTargetParser,
+        LLVMTextAPI, LLVMTextAPIBinaryReader, LLVMTelemetry, LLVMDlltoolDriver, LLVMLibDriver,
+        LLVMXRay, LLVMTestingAnnotations, LLVMTestingSupport, LLVMWindowsDriver, LLVMWindowsManifest,
+        llvm_gtest, llvm_gtest_main, LLVMCFIVerify, LLVMDiff, LLVMExegesisX86, LLVMExegesisAArch64,
+        LLVMExegesisPowerPC, LLVMExegesisMips, LLVMExegesisRISCV, LLVMExegesis, LLVMOptDriver]
+  Clang:
+    targets:
+      SharedLibrary: [ffi, ZLIB, libzstd_shared, LibXml2, LTO, LLVMgold, LLVM, Remarks,
+        clang-cpp, libclang]
+      HeaderOnlyLibrary: [LibEdit]
+      Executable: [xmllint, llvm-tblgen, FileCheck, llvm-PerfectShuffle, count, not,
+        UnicodeNameMappingGenerator, yaml-bench, split-file, llvm-test-mustache-spec,
+        llvm-ar, llvm-config, llvm-ctxprof-util, llvm-lto, llvm-profdata, bugpoint,
+        dsymutil, llc, lli-child-target, lli, llvm-as, llvm-bcanalyzer, llvm-c-test,
+        llvm-cas, llvm-cat, llvm-cfi-verify, llvm-cgdata, llvm-cov, llvm-cvtres, llvm-cxxdump,
+        llvm-cxxfilt, llvm-cxxmap, llvm-debuginfo-analyzer, llvm-debuginfod, llvm-debuginfod-find,
+        llvm-diff, llvm-dis, llvm-dwarfdump, llvm-dwarfutil, llvm-dwp, llvm-exegesis,
+        llvm-extract, llvm-gsymutil, llvm-ifs, llvm-ir2vec, llvm-jitlink-executor,
+        llvm-jitlink, llvm-libtool-darwin, llvm-link, llvm-lipo, llvm-lto2, llvm-mc,
+        llvm-mca, llvm-ml, llvm-modextract, llvm-mt, llvm-nm, llvm-objcopy, llvm-objdump,
+        llvm-offload-binary, llvm-offload-wrapper, llvm-opt-report, llvm-pdbutil,
+        llvm-profgen, llvm-rc, llvm-readobj, llvm-readtapi, llvm-reduce, llvm-remarkutil,
+        llvm-rtdyld, llvm-sim, llvm-size, llvm-split, llvm-stress, llvm-strings, llvm-symbolizer,
+        llvm-tli-checker, llvm-undname, llvm-xray, obj2yaml, opt, reduce-chunk-list,
+        sancov, sanstats, verify-uselistorder, yaml2obj, clang-tblgen, diagtool, clang,
+        clang-format, clang-linker-wrapper, clang-nvlink-wrapper, clang-offload-bundler,
+        clang-scan-deps, clang-sycl-linker, clang-installapi, clang-repl, clang-refactor,
+        clang-check, clang-extdef-mapping, clang-apply-replacements, clang-reorder-fields,
+        modularize, clang-tidy, clang-change-namespace, clang-doc, clang-include-fixer,
+        find-all-symbols, clang-move, clang-query, clang-include-cleaner, pp-trace,
+        clangd, offload-arch]
+      StaticLibrary: [LLVMDemangle, LLVMSupportLSP, LLVMSupport, LLVMTableGen, LLVMTableGenBasic,
+        LLVMTableGenCommon, LLVMABI, LLVMCore, LLVMFuzzerCLI, LLVMFuzzMutate, LLVMFileCheck,
+        LLVMInterfaceStub, LLVMIRPrinter, LLVMIRReader, LLVMCAS, LLVMCGData, LLVMCodeGen,
+        LLVMSelectionDAG, LLVMAsmPrinter, LLVMMIRParser, LLVMGlobalISel, LLVMCodeGenTypes,
+        LLVMBinaryFormat, LLVMBitReader, LLVMBitWriter, LLVMBitstreamReader, LLVMDWARFLinker,
+        LLVMDWARFLinkerClassic, LLVMDWARFLinkerParallel, LLVMExtensions, LLVMFrontendAtomic,
+        LLVMFrontendDirective, LLVMFrontendDriver, LLVMFrontendHLSL, LLVMFrontendOpenACC,
+        LLVMFrontendOpenMP, LLVMFrontendOffloading, LLVMTransformUtils, LLVMInstrumentation,
+        LLVMAggressiveInstCombine, LLVMInstCombine, LLVMScalarOpts, LLVMipo, LLVMVectorize,
+        LLVMObjCARCOpts, LLVMCoroutines, LLVMCFGuard, LLVMHipStdPar, LLVMLinker, LLVMAnalysis,
+        LLVMDTLTO, LLVMLTO, LLVMMC, LLVMMCParser, LLVMMCDisassembler, LLVMMCA, LLVMObjCopy,
+        LLVMObject, LLVMObjectYAML, LLVMOption, LLVMRemarks, LLVMDebuginfod, LLVMDebugInfoDWARFLowLevel,
+        LLVMDebugInfoDWARF, LLVMDebugInfoGSYM, LLVMDebugInfoLogicalView, LLVMDebugInfoMSF,
+        LLVMDebugInfoCodeView, LLVMDebugInfoPDB, LLVMSymbolize, LLVMDebugInfoBTF,
+        LLVMDWARFCFIChecker, LLVMDWP, LLVMExecutionEngine, LLVMInterpreter, LLVMJITLink,
+        LLVMMCJIT, LLVMOrcJIT, LLVMOrcDebugging, LLVMOrcShared, LLVMOrcTargetProcess,
+        LLVMRuntimeDyld, LLVMPerfJITEvents, LLVMTarget, LLVMAArch64CodeGen, LLVMAArch64AsmParser,
+        LLVMAArch64Disassembler, LLVMAArch64Desc, LLVMAArch64Info, LLVMAArch64Utils,
+        LLVMAMDGPUCodeGen, LLVMAMDGPUAsmParser, LLVMAMDGPUDisassembler, LLVMAMDGPUTargetMCA,
+        LLVMAMDGPUDesc, LLVMAMDGPUInfo, LLVMAMDGPUUtils, LLVMARMCodeGen, LLVMARMAsmParser,
+        LLVMARMDisassembler, LLVMARMDesc, LLVMARMInfo, LLVMARMUtils, LLVMAVRCodeGen,
+        LLVMAVRAsmParser, LLVMAVRDisassembler, LLVMAVRDesc, LLVMAVRInfo, LLVMBPFCodeGen,
+        LLVMBPFAsmParser, LLVMBPFDisassembler, LLVMBPFDesc, LLVMBPFInfo, LLVMHexagonCodeGen,
+        LLVMHexagonAsmParser, LLVMHexagonDisassembler, LLVMHexagonDesc, LLVMHexagonInfo,
+        LLVMLanaiCodeGen, LLVMLanaiAsmParser, LLVMLanaiDisassembler, LLVMLanaiDesc,
+        LLVMLanaiInfo, LLVMLoongArchCodeGen, LLVMLoongArchAsmParser, LLVMLoongArchDisassembler,
+        LLVMLoongArchDesc, LLVMLoongArchInfo, LLVMMipsCodeGen, LLVMMipsAsmParser,
+        LLVMMipsDisassembler, LLVMMipsDesc, LLVMMipsInfo, LLVMMSP430CodeGen, LLVMMSP430Desc,
+        LLVMMSP430Info, LLVMMSP430AsmParser, LLVMMSP430Disassembler, LLVMNVPTXCodeGen,
+        LLVMNVPTXDesc, LLVMNVPTXInfo, LLVMPowerPCCodeGen, LLVMPowerPCAsmParser, LLVMPowerPCDisassembler,
+        LLVMPowerPCDesc, LLVMPowerPCInfo, LLVMRISCVCodeGen, LLVMRISCVAsmParser, LLVMRISCVDisassembler,
+        LLVMRISCVDesc, LLVMRISCVTargetMCA, LLVMRISCVInfo, LLVMSparcCodeGen, LLVMSparcAsmParser,
+        LLVMSparcDisassembler, LLVMSparcDesc, LLVMSparcInfo, LLVMSPIRVCodeGen, LLVMSPIRVDesc,
+        LLVMSPIRVInfo, LLVMSPIRVAnalysis, LLVMSystemZCodeGen, LLVMSystemZAsmParser,
+        LLVMSystemZDisassembler, LLVMSystemZDesc, LLVMSystemZInfo, LLVMVECodeGen,
+        LLVMVEAsmParser, LLVMVEDisassembler, LLVMVEInfo, LLVMVEDesc, LLVMWebAssemblyCodeGen,
+        LLVMWebAssemblyAsmParser, LLVMWebAssemblyDisassembler, LLVMWebAssemblyDesc,
+        LLVMWebAssemblyInfo, LLVMWebAssemblyUtils, LLVMX86CodeGen, LLVMX86AsmParser,
+        LLVMX86Disassembler, LLVMX86TargetMCA, LLVMX86Desc, LLVMX86Info, LLVMXCoreCodeGen,
+        LLVMXCoreDisassembler, LLVMXCoreDesc, LLVMXCoreInfo, LLVMSandboxIR, LLVMAsmParser,
+        LLVMLineEditor, LLVMProfileData, LLVMCoverage, LLVMPasses, LLVMPlugins, LLVMTargetParser,
+        LLVMTextAPI, LLVMTextAPIBinaryReader, LLVMTelemetry, LLVMDlltoolDriver, LLVMLibDriver,
+        LLVMXRay, LLVMTestingAnnotations, LLVMTestingSupport, LLVMWindowsDriver, LLVMWindowsManifest,
+        llvm_gtest, llvm_gtest_main, LLVMCFIVerify, LLVMDiff, LLVMExegesisX86, LLVMExegesisAArch64,
+        LLVMExegesisPowerPC, LLVMExegesisMips, LLVMExegesisRISCV, LLVMExegesis, LLVMOptDriver]
+  CGAL:
+    targets:
+      HeaderOnlyLibrary: [Data, headers, boost, diagnostic_definitions, disable_autolinking,
+        dynamic_linking, CGAL, Threads, CGAL_Basic_viewer_Qt]
+    deps: [{ns: CGAL, pkg: placeholder}]
+  HPX:
+    targets:
+      HeaderOnlyLibrary: [asio, headers, boost, diagnostic_definitions, disable_autolinking,
+        dynamic_linking, hpx_dependencies_boost, hpx_private_flags, hpx_public_flags,
+        hpx_interface, hpx_interface_wrap_main, hpx_affinity, hpx_algorithms, hpx_allocator_support,
+        hpx_asio, hpx_assertion, hpx_async_base, hpx_async_combinators, hpx_async_local,
+        hpx_batch_environments, hpx_cache, hpx_command_line_handling_local, hpx_compute_local,
+        hpx_concepts, hpx_concurrency, hpx_config, hpx_config_registry, hpx_coroutines,
+        hpx_datastructures, hpx_debugging, hpx_errors, hpx_execution, hpx_execution_base,
+        hpx_executors, hpx_filesystem, hpx_format, hpx_functional, hpx_futures, hpx_hardware,
+        hpx_hashing, hpx_include_local, hpx_ini, hpx_init_runtime_local, hpx_io_service,
+        hpx_iterator_support, hpx_itt_notify, hpx_lcos_local, hpx_lock_registration,
+        hpx_logging, hpx_memory, hpx_pack_traversal, hpx_plugin, hpx_prefix, hpx_preprocessor,
+        hpx_program_options, hpx_properties, hpx_resiliency, hpx_resource_partitioner,
+        hpx_runtime_configuration, hpx_runtime_local, hpx_schedulers, hpx_serialization,
+        hpx_static_reinit, hpx_string_util, hpx_synchronization, hpx_tag_invoke, hpx_testing,
+        hpx_thread_pool_util, hpx_thread_pools, hpx_thread_support, hpx_threading,
+        hpx_threading_base, hpx_threadmanager, hpx_timed_execution, hpx_timing, hpx_topology,
+        hpx_type_support, hpx_util, hpx_version, hpx_actions, hpx_actions_base, hpx_agas,
+        hpx_agas_base, hpx_async_colocated, hpx_async_distributed, hpx_checkpoint,
+        hpx_checkpoint_base, hpx_collectives, hpx_command_line_handling, hpx_components,
+        hpx_components_base, hpx_compute, hpx_distribution_policies, hpx_executors_distributed,
+        hpx_include, hpx_init_runtime, hpx_lcos_distributed, hpx_naming, hpx_naming_base,
+        hpx_parcelport_tcp, hpx_parcelset, hpx_parcelset_base, hpx_performance_counters,
+        hpx_plugin_factories, hpx_resiliency_distributed, hpx_runtime_components,
+        hpx_runtime_distributed, hpx_segmented_algorithms, hpx_statistics, hpx_parcelports,
+        hpx_base_libraries, hpx, wrap_main, plugin, component, hpx_dependencies_allocator,
+        Threads, hwloc]
+      SharedLibrary: [hpx_full, hpx_core, component_storage_component, unordered_component,
+        partitioned_vector_component, iostreams_component, parcel_coalescing, io_counters_component,
+        memory_counters_component, process_component]
+      StaticLibrary: [hpx_init, hpx_wrap]
+  OpenCASCADE:
+    targets:
+      SharedLibrary: [TKernel, TKMath, TKG2d, TKG3d, TKGeomBase, TKBRep, TKGeomAlgo,
+        TKTopAlgo, TKPrim, TKBO, TKShHealing, TKBool, TKHLR, TKFillet, TKOffset, TKFeat,
+        TKMesh, TKXMesh, TKService, TKV3d, TKOpenGl, TKMeshVS, TKIVtk, TKCDF, TKLCAF,
+        TKCAF, TKBinL, TKXmlL, TKBin, TKXml, TKStdL, TKStd, TKTObj, TKBinTObj, TKXmlTObj,
+        TKVCAF, TKDE, TKXSBase, TKDESTEP, TKXCAF, TKDEIGES, TKDESTL, TKDEVRML, TKRWMesh,
+        TKDECascade, TKBinXCAF, TKXmlXCAF, TKDEOBJ, TKDEGLTF, TKDEPLY, TKExpress,
+        TKDraw, TKTopTest, TKOpenGlTest, TKViewerTest, TKXSDRAW, TKDCAF, TKXDEDRAW,
+        TKTObjDRAW, TKQADraw, TKIVtkDraw, TKXSDRAWDE, TKXSDRAWGLTF, TKXSDRAWIGES,
+        TKXSDRAWOBJ, TKXSDRAWPLY, TKXSDRAWSTEP, TKXSDRAWSTL, TKXSDRAWVRML]
+    deps: [{ns: VTK, pkg: VTK}]
+  ITK:
+    targets:
+      SharedLibrary: [itkdouble-conversion, itksys, ITKVNLInstantiation, ITKCommon,
+        itkNetlibSlatec, ITKStatistics, ITKTransform, ITKIOImageBase, ITKIOBMP, ITKIOGDCM,
+        ITKIOGIPL, ITKIOJPEG, ITKMetaIO, ITKIOMeta, ITKznz, ITKniftiio, ITKIONIFTI,
+        ITKNrrdIO, ITKIONRRD, ITKIOPNG, ITKIOTIFF, ITKIOVTK, ITKLabelMap, ITKMesh,
+        ITKSpatialObjects, ITKPath, ITKQuadEdgeMesh, ITKOptimizers, ITKPolynomials,
+        ITKBiasCorrection, ITKBioCell, ITKFFT, ITKDICOMParser, ITKIOXML, ITKIOSpatialObjects,
+        ITKFEM, ITKgiftiio, ITKIOMesh, ITKIOBioRad, ITKIOBruker, ITKIOCSV, ITKIOIPL,
+        ITKIOGE, ITKIOSiemens, ITKIOHDF5, ITKIOLSM, ITKIOMINC, ITKIOMRC, ITKIOStimulate,
+        ITKTransformFactory, ITKIOTransformBase, ITKIOTransformHDF5, ITKIOTransformInsightLegacy,
+        ITKIOTransformMatlab, ITKKLMRegionGrowing, ITKVTK, ITKWatersheds, itklbfgs,
+        ITKOptimizersv4, itkopenjpeg, ITKReview, ITKVideoCore, ITKVideoIO, ITKVtkGlue,
+        gdcmjpeg8, gdcmjpeg12, gdcmjpeg16, gdcmmd5, socketxx, gdcmCommon, gdcmDICT,
+        gdcmDSED, gdcmIOD, gdcmMSFF, gdcmMEXD]
+      Executable: [itkTestDriver, gdcmdump, gdcmdiff, gdcmraw, gdcmscanner, gdcmanon,
+        gdcmclean, gdcmgendir, gdcmimg, gdcmconv, gdcmtar, gdcminfo, gdcmscu, gdcmxml,
+        gdcmpap3, gdcmpdf]
+    deps: [{ns: VTK, pkg: VTK}]
+    hints: -DITK_DIR=/usr/lib64/cmake/InsightToolkit -DITKVtkGlue_LOADED=1
+  Ceres:
+    targets:
+      HeaderOnlyLibrary: [Threads, BLAS, LAPACK, Eigen]
+      SharedLibrary: [AMD, CAMD, CCOLAMD, CHOLMOD, COLAMD, SPQR, Config, tbb, tbbmalloc,
+        tbbmalloc_proxy, tbbbind_2_5, irml, gflags_shared, gflags_nothreads_shared,
+        gflags, glog, ceres]
+    deps: [{ns: PkgConfig, pkg: hwloc}]
+  Bullet:
+    targets:
+      HeaderOnlyLibrary: [Bullet_libs]

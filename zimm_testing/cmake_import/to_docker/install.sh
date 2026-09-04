@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-dnf -y --setopt=install_weak_deps=False install \
-    gcc gcc-c++ cmake ninja-build git python3 \
+dnf -y --setopt=install_weak_deps=False --setopt=keepcache=True install \
+    gcc gcc-c++ cmake ninja-build git python3 python3-pyyaml \
     fmt-devel \
     spdlog-devel \
     gtest-devel gmock-devel \
@@ -34,5 +34,3 @@ dnf -y --setopt=install_weak_deps=False install \
     libminc-devel \
     ceres-solver-devel \
     bullet-devel
-
-dnf -y clean all

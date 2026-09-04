@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 ZIMM = Path("/opt/zimm")
 BUILD = Path("/work/build")
 ZE_BUILD = Path("/opt/harness/ze_build.cpp")
+TARGETS_YML = Path("/opt/harness/targets.yml")
 
 
 def tee_run(cmd, log: Path, cwd: Path) -> int:
@@ -21,11 +25,43 @@ def tee_run(cmd, log: Path, cwd: Path) -> int:
             print(line, end="", flush=True)
     return proc.wait()
 
+def parse_targets(targets):
+    items = []
+    for targetType, names in targets.items():
+        for name in names:
+            items.append(f'{{"{name}", {targetType}}}')
+    return "{" + ", ".join(items) + "}"
+
+def parse_deps(deps):
+    items = [f'{{"{dep["pkg"]}", "{dep["ns"]}"}}' for dep in deps]
+    return "{" + ", ".join(items) + "}"
+
+def targets_yml_to_cpp_str():
+    data = yaml.safe_load(TARGETS_YML.read_text(encoding="utf-8"))
+    return ",\n    ".join(
+        '{"%s", "%s", %s, %s, "%s"}' % (
+            name,
+            pkg.get("args", ""),
+            parse_targets(pkg["targets"]),
+            parse_deps(pkg.get("deps", [])),
+            pkg.get("hints", ""))
+        for name, pkg in data["packages"].items())
+
+def prepare_ze_build():
+    text = ZE_BUILD.read_text(encoding="utf-8")
+    newText = re.sub(
+        r"const std::vector<Package> packages = {};",
+        lambda _: f"const std::vector<Package> packages = {{{targets_yml_to_cpp_str()}}};",
+        text, count=1, flags=re.S)
+    ZE_BUILD.write_text(newText, encoding="utf-8")
+
 
 def main() -> int:
     if BUILD.exists():
         shutil.rmtree(BUILD)
     BUILD.mkdir(parents=True)
+
+    prepare_ze_build()
 
     compileCmd = ["g++", str(ZE_BUILD), "-std=c++23", "-g",
              f"-I{ZIMM / 'include'}", f"-L{ZIMM / 'lib64'}", "-lzimmermann",
