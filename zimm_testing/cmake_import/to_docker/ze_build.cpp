@@ -525,8 +525,7 @@ ThirdPartyTargetManifest fabricate_hwloc()
 // with an empty interface satisfies the CGAL::CGAL_BasicViewer_Qt link reference.
 ThirdPartyTargetManifest fabricate_cgal_qt6_placeholder()
 {
-    ThirdPartyTarget *tpt =
-        ThirdPartyTarget::make("cgal_qt6_placeholder", Directory::make("/usr"));
+    ThirdPartyTarget *tpt = ThirdPartyTarget::make("cgal_qt6_placeholder", Directory::make("/usr"));
     zimm::HeaderOnlyLibrary *qt6 = make_header_only_library("CGAL_Qt6");
     add_dependency_rel(qt6, tpt);
     return {tpt, {qt6}};
@@ -543,8 +542,7 @@ ThirdPartyTargetManifest fabricate_vtk()
     std::vector<Target *> targets;
     for (std::string_view name : {"CommonCore", "FiltersGeneral", "IOImage", "ImagingCore",
                                   "ImagingSources", "InteractionStyle", "RenderingCore",
-                                  "RenderingFreeType", "RenderingGL2PSOpenGL2",
-                                  "RenderingOpenGL2"})
+                                  "RenderingFreeType", "RenderingGL2PSOpenGL2", "RenderingOpenGL2"})
         targets.push_back(tpt->assume_shared_library(
             std::string{name}, detail::RelativePath{std::format("lib64/libvtk{}.so", name)}));
     tpt->add_public_property(IncludeProperty{Directory::make("/usr/include/vtk")});
@@ -607,8 +605,7 @@ void check_no_extras(const ThirdPartyTargetManifest &manifest, const Package &pk
                 known = true;
                 break;
             }
-        if (!known)
-            extras.push_back(std::format("{} ({})", t->name(), to_string(t->type())));
+        if (!known) extras.push_back(std::format("{} ({})", t->name(), to_string(t->type())));
     }
 
     if (!extras.empty())
@@ -678,9 +675,9 @@ int test_packages()
                 deps.push_back({std::string{spec.ns}, it->second});
             }
 
-            FindCmakePackageTptStrategy strategy{
-                std::vector<Directory>{Directory::make("/usr")}, std::string{pkg.cmakeArgs},
-                "relwithdebinfo", std::string{pkg.hints}};
+            FindCmakePackageTptStrategy strategy{std::vector<Directory>{Directory::make("/usr")},
+                                                 std::string{pkg.cmakeArgs}, "relwithdebinfo",
+                                                 std::string{pkg.hints}};
             auto manifest = strategy.attempt(pkg.cmakeName, deps);
             found[std::string{pkg.cmakeName}] = manifest; // rows feed later rows
 

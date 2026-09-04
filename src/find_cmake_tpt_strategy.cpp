@@ -65,13 +65,25 @@ constexpr std::string_view cmake_build_type(std::string_view buildType)
 }
 
 // CMake target TYPE → zimm TargetType; nullopt for types zimm can't represent.
-std::optional<TargetType> zimm_type_of(std::string_view cmakeType)
+// UNKNOWN_LIBRARY (what find-modules and hand-written configs give UNKNOWN IMPORTED)
+// carries no type information — classify by resolved location: .a/.lib → static,
+// .so/.dylib/extensionless → shared, no location → header-only. A location alone
+// can't tell an executable from a library; every UNKNOWN target Fedora ships is a
+// library, so no /usr/bin heuristic until one actually shows up.
+std::optional<TargetType> zimm_type_of(std::string_view cmakeType, const std::string &location)
 {
     if (cmakeType == "STATIC_LIBRARY") return TargetType::StaticLibrary;
     if (cmakeType == "SHARED_LIBRARY" || cmakeType == "MODULE_LIBRARY")
         return TargetType::SharedLibrary;
     if (cmakeType == "EXECUTABLE") return TargetType::Executable;
     if (cmakeType == "INTERFACE_LIBRARY") return TargetType::HeaderOnlyLibrary;
+    if (cmakeType == "UNKNOWN_LIBRARY")
+    {
+        if (location.empty()) return TargetType::HeaderOnlyLibrary;
+        const std::string ext = fs::path{location}.extension().string();
+        if (ext == ".a" || ext == ".lib") return TargetType::StaticLibrary;
+        return TargetType::SharedLibrary;
+    }
     return std::nullopt;
 }
 
@@ -358,16 +370,21 @@ std::string injected_targets_block(std::span<const CmakeDependency> deps)
             std::string_view kind;
             switch (target->type())
             {
-            case TargetType::StaticLibrary: kind = "STATIC"; break;
-            case TargetType::SharedLibrary: kind = "SHARED"; break;
-            case TargetType::HeaderOnlyLibrary: kind = "INTERFACE"; break;
+            case TargetType::StaticLibrary:
+                kind = "STATIC";
+                break;
+            case TargetType::SharedLibrary:
+                kind = "SHARED";
+                break;
+            case TargetType::HeaderOnlyLibrary:
+                kind = "INTERFACE";
+                break;
             case TargetType::Executable:
                 continue;
             default:
-                LOGW("injected dependency target '" << target->name() << "' of '"
-                                                    << dep.cmakeNamespace
-                                                    << "' has unsupported type "
-                                                    << to_string(target->type()) << " — skipping");
+                LOGW("injected dependency target '"
+                     << target->name() << "' of '" << dep.cmakeNamespace
+                     << "' has unsupported type " << to_string(target->type()) << " — skipping");
                 continue;
             }
 
@@ -407,12 +424,11 @@ std::string injected_targets_block(std::span<const CmakeDependency> deps)
             block += std::format("if(NOT TARGET \"{}\")\n", nsName);
             block += std::format("  add_library(\"{}\" {} IMPORTED)\n", nsName, kind);
             block += std::format("  set_target_properties(\"{}\" PROPERTIES\n", nsName);
-            if (!location.empty())
-                block += std::format("    IMPORTED_LOCATION \"{}\"\n", location);
+            if (!location.empty()) block += std::format("    IMPORTED_LOCATION \"{}\"\n", location);
             if (!includeDirs.empty())
-                block += std::format(
-                    "    INTERFACE_INCLUDE_DIRECTORIES \"{}\"\n",
-                    includeDirs | std::views::join_with(';') | std::ranges::to<std::string>());
+                block += std::format("    INTERFACE_INCLUDE_DIRECTORIES \"{}\"\n",
+                                     includeDirs | std::views::join_with(';') |
+                                         std::ranges::to<std::string>());
             block += "    ZIMM_INJECTED TRUE)\n";
             block += "endif()\n";
         }
@@ -420,12 +436,10 @@ std::string injected_targets_block(std::span<const CmakeDependency> deps)
     return block;
 }
 
-std::optional<ParsedCmakeResult> run_cmake_wrapper(const Directory &scratch, std::string_view name,
-                                                   std::string_view findPackageArgs,
-                                                   std::string_view buildType,
-                                                   std::span<const Directory> searchDirs,
-                                                   std::span<const CmakeDependency> deps,
-                                                   std::string_view findPackageHints)
+std::optional<ParsedCmakeResult>
+run_cmake_wrapper(const Directory &scratch, std::string_view name, std::string_view findPackageArgs,
+                  std::string_view buildType, std::span<const Directory> searchDirs,
+                  std::span<const CmakeDependency> deps, std::string_view findPackageHints)
 {
     fs::remove(scratch.path());
     fs::create_directories(scratch.path());
@@ -449,10 +463,9 @@ std::optional<ParsedCmakeResult> run_cmake_wrapper(const Directory &scratch, std
 
     const std::string buildDir = (scratch.path() / "build").string();
     const std::string logFile = (scratch.path() / "configure.log").string();
-    const std::string cmd = std::format("cmake -S {} -B {} -DCMAKE_BUILD_TYPE={} {} {} > {} 2>&1",
-                                        scratch.path().string(), buildDir,
-                                        cmake_build_type(buildType), prefixPathFlag,
-                                        findPackageHints, logFile);
+    const std::string cmd = std::format(
+        "cmake -S {} -B {} -DCMAKE_BUILD_TYPE={} {} {} > {} 2>&1", scratch.path().string(),
+        buildDir, cmake_build_type(buildType), prefixPathFlag, findPackageHints, logFile);
 
     if (std::system(cmd.c_str()) != 0)
     {
@@ -533,7 +546,8 @@ std::vector<ImportedTarget> select_targets(std::string_view name, const ParsedCm
 }
 
 // One materializable entry: target kind, zimm name, and a path relative to the TPT
-// dir (the artifact for located targets, the include dir for header-only ones).
+// dir (the artifact for located targets, the include dir for header-only ones — "."
+// when a header-only target carries no include dir).
 struct Entry
 {
     TargetType type;
@@ -554,7 +568,11 @@ std::optional<Entry> entry_of(const ImportedTarget &tgt, std::set<std::string> &
         return std::nullopt;
     }
 
-    auto zimmType = zimm_type_of(tgt.type);
+    // resolve the location up front: UNKNOWN_LIBRARY classifies by it, and located
+    // types need it for their manifest path — one rule (location, else fallback), no drift
+    const std::string location = !tgt.location.empty() ? tgt.location : tgt.location_fallback;
+
+    auto zimmType = zimm_type_of(tgt.type, location);
     if (!zimmType)
     {
         LOGW("unsupported imported target type '" << tgt.type << "' for '" << tgt.name
@@ -565,17 +583,18 @@ std::optional<Entry> entry_of(const ImportedTarget &tgt, std::set<std::string> &
     std::string rel;
     if (*zimmType == TargetType::HeaderOnlyLibrary)
     {
-        // manifest path = the (first) include dir, relative to the prefix
-        if (tgt.include_dirs.empty())
-        {
-            LOGW("header-only target '" << tgt.name << "' has no include dirs — skipping");
-            return std::nullopt;
-        }
-        rel = to_relative(resolve_against_config(tgt.include_dirs[0], configPath), prefixDir);
+        // INTERFACE targets are retained even when they carry no include dirs: their
+        // purpose may be flags only (Boost's dynamic_linking, HPX's flag interfaces,
+        // Threads::Threads), and CMake semantics keep the target regardless — dropping
+        // it would strand every link reference to it. The manifest path is cosmetic
+        // for header-only targets: the first include dir relative to the prefix when
+        // one exists, "." otherwise.
+        if (tgt.include_dirs.empty()) rel = ".";
+        else rel = to_relative(resolve_against_config(tgt.include_dirs[0], configPath), prefixDir);
+        if (rel.empty()) rel = "."; // include dir outside the prefix — retain regardless
     }
     else
     {
-        std::string location = !tgt.location.empty() ? tgt.location : tgt.location_fallback;
         if (location.empty())
         {
             LOGW("imported target '" << tgt.name

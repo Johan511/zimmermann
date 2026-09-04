@@ -177,7 +177,8 @@ public:
     // fabricates as IMPORTED targets under the dep's cmakeNamespace, so the searched
     // package's cross-package link references resolve. Their link edges land on this
     // package's materialized targets; they never enter the returned manifest.
-    ThirdPartyTargetManifest attempt(std::string_view name, std::span<CmakeDependency> deps = {}) const;
+    ThirdPartyTargetManifest attempt(std::string_view name,
+                                     std::span<CmakeDependency> deps = {}) const;
 };
 
 class FetchContentTptStrategy
