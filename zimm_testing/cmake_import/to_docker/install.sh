@@ -27,7 +27,11 @@ dnf -y --setopt=install_weak_deps=False install \
     CGAL-devel \
     hpx-devel \
     opencascade-devel \
+    vtk-devel \
+    hwloc-devel \
     InsightToolkit-devel \
+    gdcm-devel \
+    libminc-devel \
     ceres-solver-devel \
     bullet-devel
 

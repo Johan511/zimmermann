@@ -40,7 +40,7 @@ def main() -> int:
     rc = tee_run([str(BUILD / "ze_build")], BUILD / "ze_build.log", cwd=BUILD)
     if rc != 0:
         print("\nfailure logs copied to host: "
-              "zimm_testing/cmake_import/from_docker/cmake_find/<pkg>/configure.log",
+              "zimm_testing/cmake_import/from_docker/.zimm_cmake_find/<pkg>/configure.log",
               file=sys.stderr)
     return rc
 

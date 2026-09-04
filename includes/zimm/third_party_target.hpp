@@ -4,6 +4,7 @@
 #include "target.hpp"
 #include <format>
 #include <functional>
+#include <span>
 #include <string_view>
 #include <tuple>
 
@@ -53,6 +54,18 @@ public:
 
     std::vector<Target *> targets(std::string name = "");
     std::vector<const Target *> targets(std::string name = "") const;
+};
+
+// User-injected dependency for FindCmakePackageTptStrategy::attempt(): every target of
+// `manifest` is fabricated into the wrapper's CMake session as an IMPORTED target named
+// `<cmakeNamespace>::<name>` (empty namespace → bare name), so that the searched
+// package's link references into other packages' targets resolve into real zimm link
+// edges. Shallow copy — the caller keeps the manifest and its targets alive for the
+// duration of the attempt() call.
+struct CmakeDependency
+{
+    std::string cmakeNamespace;        // targets exposed as <namespace>::<name>; empty = bare name
+    ThirdPartyTargetManifest manifest; // shallow-copied; caller keeps the targets alive
 };
 
 class ThirdPartyTarget;
@@ -152,14 +165,19 @@ class FindCmakePackageTptStrategy
     std::vector<Directory> m_searchDirs;
     std::string m_findPackageArgs;
     std::string m_buildType;
+    std::string m_findPackageHints;
 
 public:
     // clang-format off
-    FindCmakePackageTptStrategy(Directory searchPath, std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo");
-    FindCmakePackageTptStrategy(std::vector<Directory> searchPaths, std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo");
-    FindCmakePackageTptStrategy(std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo");
+    FindCmakePackageTptStrategy(Directory searchPath, std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo", std::string findPackageHints = {});
+    FindCmakePackageTptStrategy(std::vector<Directory> searchPaths, std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo", std::string findPackageHints = {});
+    FindCmakePackageTptStrategy(std::string findPackageArgs = {}, std::string buildType = "relwithdebinfo", std::string findPackageHints = {});
     // clang-format on
-    ThirdPartyTargetManifest attempt(std::string_view name) const;
+    // `deps` are user-injected already-found dependencies whose targets the wrapper
+    // fabricates as IMPORTED targets under the dep's cmakeNamespace, so the searched
+    // package's cross-package link references resolve. Their link edges land on this
+    // package's materialized targets; they never enter the returned manifest.
+    ThirdPartyTargetManifest attempt(std::string_view name, std::span<CmakeDependency> deps = {}) const;
 };
 
 class FetchContentTptStrategy

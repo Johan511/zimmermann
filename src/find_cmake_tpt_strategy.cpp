@@ -256,20 +256,33 @@ static constexpr auto WRAPPER_TEMPLATE = R"CMAKELISTS(
 cmake_minimum_required(VERSION 3.25)
 project(zimm_find NONE)
 enable_language(C CXX)
-
+{3}
 find_package({0} CONFIG REQUIRED {1})
 
 set(_content "")
+string(TOUPPER "{0}" _zimm_upper)
 string(APPEND _content "package={0}\n")
 string(APPEND _content "config=${{{0}_CONFIG}}\n")
 string(APPEND _content "dir=${{{0}_DIR}}\n")
-string(APPEND _content "include_dirs=${{{0}_INCLUDE_DIRS}}\n")
-string(APPEND _content "libraries=${{{0}_LIBRARIES}}\n")
+set(_pkg_inc_dirs "${{{0}_INCLUDE_DIRS}}")
+if(_pkg_inc_dirs STREQUAL "")
+  set(_pkg_inc_dirs "${{${{_zimm_upper}}_INCLUDE_DIRS}}")
+endif()
+string(APPEND _content "include_dirs=${{_pkg_inc_dirs}}\n")
+set(_pkg_libs "${{{0}_LIBRARIES}}")
+if(_pkg_libs STREQUAL "")
+  set(_pkg_libs "${{${{_zimm_upper}}_LIBRARIES}}")
+endif()
+string(APPEND _content "libraries=${{_pkg_libs}}\n")
 
 get_property(_imported DIRECTORY "${{CMAKE_CURRENT_SOURCE_DIR}}" PROPERTY IMPORTED_TARGETS)
 
 set(_i 0)
 foreach(_tgt IN LISTS _imported)
+  get_target_property(_zimm_injected "${{_tgt}}" ZIMM_INJECTED)
+  if(_zimm_injected)
+    continue()
+  endif()
   get_target_property(_type "${{_tgt}}" TYPE)
   add_library("zimm_wrap_${{_i}}" INTERFACE)
   target_link_libraries("zimm_wrap_${{_i}}" INTERFACE "${{_tgt}}")
@@ -282,13 +295,21 @@ foreach(_tgt IN LISTS _imported)
   string(APPEND _content "include_dirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_INCLUDE_DIRECTORIES>,;>\n")
   string(APPEND _content "system_include_dirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>,;>\n")
   string(APPEND _content "defs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_COMPILE_DEFINITIONS>,;>\n")
-  string(APPEND _content "compile_opts=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_COMPILE_OPTIONS>,;>\n")
+  get_target_property(_zimm_copt "${{_tgt}}" INTERFACE_COMPILE_OPTIONS)
+  if(_zimm_copt MATCHES "NOTFOUND")
+    set(_zimm_copt "")
+  endif()
+  # genex-bearing values would make the file(GENERATE) content vary per evaluation pass
+  if(_zimm_copt MATCHES "\\$<")
+    set(_zimm_copt "")
+  endif()
+  string(APPEND _content "compile_opts=${{_zimm_copt}}\n")
   string(APPEND _content "link_dirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_LINK_DIRECTORIES>,;>\n")
   string(APPEND _content "link_opts=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_LINK_OPTIONS>,;>\n")
   string(APPEND _content "link_libs_direct=$<JOIN:$<TARGET_PROPERTY:${{_tgt}},INTERFACE_LINK_LIBRARIES>,;>\n")
   math(EXPR _i "${{_i}} + 1")
 endforeach()
-file(GENERATE OUTPUT "{2}/vars.txt" CONTENT "${{_content}}")
+file(GENERATE OUTPUT "{2}/vars_$<CONFIG>.txt" CONTENT "${{_content}}")
 )CMAKELISTS";
 // clang-format on
 
@@ -316,10 +337,95 @@ bool check_cmake_version(const Directory &scratch)
     return true;
 }
 
+// Fabricate every target of the user-injected dependencies as an IMPORTED CMake target
+// named "<namespace>::<name>" so that the searched package's link references into other
+// packages' targets resolve. Pure transcription of zimm-side data — nothing is
+// discovered or guessed; the namespace is the one user-supplied value.
+std::string injected_targets_block(std::span<const CmakeDependency> deps)
+{
+    std::string block;
+    for (const CmakeDependency &dep : deps)
+    {
+        if (dep.manifest.targets().empty())
+        {
+            LOGW("injected dependency '" << dep.cmakeNamespace
+                                         << "' has an empty manifest — skipping");
+            continue;
+        }
+
+        for (const Target *target : dep.manifest.targets())
+        {
+            std::string_view kind;
+            switch (target->type())
+            {
+            case TargetType::StaticLibrary: kind = "STATIC"; break;
+            case TargetType::SharedLibrary: kind = "SHARED"; break;
+            case TargetType::HeaderOnlyLibrary: kind = "INTERFACE"; break;
+            case TargetType::Executable:
+                continue;
+            default:
+                LOGW("injected dependency target '" << target->name() << "' of '"
+                                                    << dep.cmakeNamespace
+                                                    << "' has unsupported type "
+                                                    << to_string(target->type()) << " — skipping");
+                continue;
+            }
+
+            const std::string nsName =
+                dep.cmakeNamespace.empty()
+                    ? std::string{target->name()}
+                    : std::format("{}::{}", dep.cmakeNamespace, target->name());
+
+            // header-only targets are always fabricated (even with an empty interface —
+            // existence at generate time is the point); located ones need a location
+            std::string location;
+            if (kind != "INTERFACE")
+            {
+                if (!target->assumed_path())
+                {
+                    LOGW("injected dependency target '" << nsName
+                                                        << "' has no assumed path — skipping");
+                    continue;
+                }
+                location = target->assumed_path()->path().string();
+            }
+
+            std::vector<std::string> includeDirs;
+            auto collectIncludes = [&](std::span<const PropertyObject> props)
+            {
+                for (const auto &prop : props)
+                    if (prop->type() == PropertyType::Include)
+                        includeDirs.push_back(static_cast<const IncludeProperty &>(*prop)
+                                                  .include_path()
+                                                  .path()
+                                                  .string());
+            };
+            collectIncludes(target->public_properties());
+            if (const ThirdPartyTarget *tpt = dep.manifest.tpt())
+                collectIncludes(tpt->public_properties());
+
+            block += std::format("if(NOT TARGET \"{}\")\n", nsName);
+            block += std::format("  add_library(\"{}\" {} IMPORTED)\n", nsName, kind);
+            block += std::format("  set_target_properties(\"{}\" PROPERTIES\n", nsName);
+            if (!location.empty())
+                block += std::format("    IMPORTED_LOCATION \"{}\"\n", location);
+            if (!includeDirs.empty())
+                block += std::format(
+                    "    INTERFACE_INCLUDE_DIRECTORIES \"{}\"\n",
+                    includeDirs | std::views::join_with(';') | std::ranges::to<std::string>());
+            block += "    ZIMM_INJECTED TRUE)\n";
+            block += "endif()\n";
+        }
+    }
+    return block;
+}
+
 std::optional<ParsedCmakeResult> run_cmake_wrapper(const Directory &scratch, std::string_view name,
                                                    std::string_view findPackageArgs,
                                                    std::string_view buildType,
-                                                   std::span<const Directory> searchDirs)
+                                                   std::span<const Directory> searchDirs,
+                                                   std::span<const CmakeDependency> deps,
+                                                   std::string_view findPackageHints)
 {
     fs::remove(scratch.path());
     fs::create_directories(scratch.path());
@@ -327,8 +433,10 @@ std::optional<ParsedCmakeResult> run_cmake_wrapper(const Directory &scratch, std
     for (const auto &entry : fs::directory_iterator(scratch.path()))
         if (entry.path().extension() == ".txt") fs::remove(entry.path());
 
-    std::string cmakeLists =
-        std::format(WRAPPER_TEMPLATE, name, findPackageArgs, scratch.path().string());
+    if (!check_cmake_version(scratch)) return std::nullopt;
+
+    std::string cmakeLists = std::format(WRAPPER_TEMPLATE, name, findPackageArgs,
+                                         scratch.path().string(), injected_targets_block(deps));
     {
         std::ofstream ofs{scratch.file("CMakeLists.txt").path()};
         ofs << cmakeLists;
@@ -341,9 +449,10 @@ std::optional<ParsedCmakeResult> run_cmake_wrapper(const Directory &scratch, std
 
     const std::string buildDir = (scratch.path() / "build").string();
     const std::string logFile = (scratch.path() / "configure.log").string();
-    const std::string cmd =
-        std::format("cmake -S {} -B {} -DCMAKE_BUILD_TYPE={} {} > {} 2>&1", scratch.path().string(),
-                    buildDir, cmake_build_type(buildType), prefixPathFlag, logFile);
+    const std::string cmd = std::format("cmake -S {} -B {} -DCMAKE_BUILD_TYPE={} {} {} > {} 2>&1",
+                                        scratch.path().string(), buildDir,
+                                        cmake_build_type(buildType), prefixPathFlag,
+                                        findPackageHints, logFile);
 
     if (std::system(cmd.c_str()) != 0)
     {
@@ -352,7 +461,31 @@ std::optional<ParsedCmakeResult> run_cmake_wrapper(const Directory &scratch, std
                                 "to the next strategy (or failing if this was the last).");
         return std::nullopt;
     }
-    return parse_cmake_result(scratch.file("vars.txt"));
+
+    // The dump name carries the config (multi-config generators write one per config; an
+    // empty CMAKE_BUILD_TYPE yields vars_.txt) — prefer this run's config, else the
+    // first dump the generate phase actually wrote.
+    const std::string varsName = std::format("vars_{}.txt", cmake_build_type(buildType));
+    fs::path varsPath = scratch.path() / varsName;
+    if (!fs::exists(varsPath))
+    {
+        LOGI("no " << varsName << " dump — using the first vars_*.txt written");
+        for (const auto &entry : fs::directory_iterator(scratch.path()))
+        {
+            const std::string fname = entry.path().filename().string();
+            if (fname.starts_with("vars_") && fname.ends_with(".txt"))
+            {
+                varsPath = entry.path();
+                break;
+            }
+        }
+    }
+    if (!fs::exists(varsPath))
+    {
+        LOGW("configure reported success but no vars_*.txt dump exists — see " << logFile);
+        return std::nullopt;
+    }
+    return parse_cmake_result(File::make(varsPath.string()));
 }
 
 // ---- population engine -------------------------------------------------------
@@ -386,7 +519,8 @@ std::vector<ImportedTarget> select_targets(std::string_view name, const ParsedCm
     if (incDirs.empty() && libs.empty())
     {
         LOGW("package found but defines no imported targets and no "
-             "<name>_INCLUDE_DIRS/<name>_LIBRARIES — nothing to link");
+             "<name>_INCLUDE_DIRS/<name>_LIBRARIES (ALL-CAPS <NAME>_ variants tried too) — "
+             "nothing to link");
         return {};
     }
 
@@ -542,7 +676,13 @@ void apply_link_entries(Target &target, const ImportedTarget &tgt,
         auto depIt = byName.find(strip_namespace(entry));
         if (depIt == byName.end())
         {
-            target.add_public_property(LinkFlagProperty{entry});
+            // a namespaced ref is a CMake target reference; without an injected (or
+            // package-owned) target behind it it must not degrade into a raw link flag
+            if (entry.contains("::"))
+                LOGW("INTERFACE_LINK_LIBRARIES entry '" << ref << "' of '" << tgt.name
+                                                        << "' references unknown target '" << entry
+                                                        << "' — dropped");
+            else target.add_public_property(LinkFlagProperty{entry});
             continue;
         }
         Target *dep = depIt->second;
@@ -572,14 +712,18 @@ void apply_link_entries(Target &target, const ImportedTarget &tgt,
     }
 }
 
-// Pass 2: attach usage requirements to the materialized targets.
+// Pass 2: attach usage requirements to the materialized targets. `injected` are the
+// dependency targets fabricated into the wrapper — seeded LAST so a package's own
+// targets win name collisions (intra-package refs like OCCT::TKernel must hit the
+// package's own targets, not an injected one).
 void wire_usage(const std::vector<ImportedTarget> &tgts, const BuildResult &built,
                 const std::vector<Executable *> &exes, const std::vector<Library *> &libs,
-                const std::string &configPath)
+                const std::string &configPath, std::span<Library *const> injected)
 {
     std::map<std::string, Target *, std::less<>> byName;
     for (auto *e : exes) byName.emplace(e->name(), e);
     for (auto *l : libs) byName.emplace(l->name(), l);
+    for (Library *inj : injected) byName.emplace(inj->name(), inj);
 
     for (size_t i = 0; i < tgts.size(); ++i)
     {
@@ -603,33 +747,40 @@ namespace zimm
 {
 FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(Directory searchPath,
                                                          std::string findPackageArgs,
-                                                         std::string buildType)
-    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType))
+                                                         std::string buildType,
+                                                         std::string findPackageHints)
+    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType)),
+      m_findPackageHints(std::move(findPackageHints))
 {
     m_searchDirs.push_back(std::move(searchPath));
 }
 
 FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(std::vector<Directory> searchPaths,
                                                          std::string findPackageArgs,
-                                                         std::string buildType)
-    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType))
+                                                         std::string buildType,
+                                                         std::string findPackageHints)
+    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType)),
+      m_findPackageHints(std::move(findPackageHints))
 {
     for (auto &searchPath : searchPaths) m_searchDirs.push_back(std::move(searchPath));
 }
 
 FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(std::string findPackageArgs,
-                                                         std::string buildType)
-    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType))
+                                                         std::string buildType,
+                                                         std::string findPackageHints)
+    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType)),
+      m_findPackageHints(std::move(findPackageHints))
 {
 }
 
-ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view name) const
+ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view name,
+                                                              std::span<CmakeDependency> deps) const
 {
     Directory scratch =
         Directory::make(std::format(".zimm_cmake_find/{}", sanitize_pkg_name(name)));
 
-    auto cmakeResultOpt =
-        run_cmake_wrapper(scratch, name, m_findPackageArgs, m_buildType, m_searchDirs);
+    auto cmakeResultOpt = run_cmake_wrapper(scratch, name, m_findPackageArgs, m_buildType,
+                                            m_searchDirs, deps, m_findPackageHints);
     if (!cmakeResultOpt) return {};
     auto cmakeResult = std::move(*cmakeResultOpt);
 
@@ -657,7 +808,16 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
         else libs.push_back(static_cast<Library *>(target));
     }
 
-    wire_usage(tgts, built, exes, libs, cmakeResult.config);
+    // Injected dependency targets only capture link references the package doesn't
+    // resolve itself; they are never dumped, never enter built/exes/libs, and stay out
+    // of the returned manifest — the user keeps the dep manifests alive.
+    std::vector<Library *> injected;
+    for (CmakeDependency &dep : deps)
+        for (Target *depTarget : dep.manifest.targets())
+            if (depTarget->type() != TargetType::Executable)
+                injected.push_back(static_cast<Library *>(depTarget));
+
+    wire_usage(tgts, built, exes, libs, cmakeResult.config, injected);
     return {tpt, std::move(assumed)};
 }
 } // namespace zimm
