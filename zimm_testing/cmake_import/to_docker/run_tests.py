@@ -16,7 +16,7 @@ TARGETS_YML = Path("/opt/harness/targets.yml")
 def tee_run(cmd, log: Path, cwd: Path) -> int:
     """Run cmd, streaming merged output to the console and to log."""
     proc = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, bufsize=1)
+                            stderr=subprocess.STDOUT, text=True, errors="replace")
     with log.open("w") as f:
         assert proc.stdout is not None
         for line in proc.stdout:
@@ -29,11 +29,11 @@ def parse_targets(targets):
     items = []
     for targetType, names in targets.items():
         for name in names:
-            items.append(f'{{"{name}", {targetType}}}')
+            items.append(f'{{TargetType::{targetType}, "{name}"}}')
     return "{" + ", ".join(items) + "}"
 
 def parse_deps(deps):
-    items = [f'{{"{dep["pkg"]}", "{dep["ns"]}"}}' for dep in deps]
+    items = [f'{{"{dep["ns"]}", "{dep["pkg"]}"}}' for dep in deps]
     return "{" + ", ".join(items) + "}"
 
 def targets_yml_to_cpp_str():
@@ -63,7 +63,7 @@ def main() -> int:
 
     prepare_ze_build()
 
-    compileCmd = ["g++", str(ZE_BUILD), "-std=c++23", "-g",
+    compileCmd = ["g++", str(ZE_BUILD), "-std=c++26", "-g",
              f"-I{ZIMM / 'include'}", f"-L{ZIMM / 'lib64'}", "-lzimmermann",
              "-Wall", "-Wextra", "-Wpedantic", "-Werror",
              "-o", str(BUILD / "ze_build")]

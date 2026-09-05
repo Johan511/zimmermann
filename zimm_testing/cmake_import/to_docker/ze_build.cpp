@@ -1,66 +1,50 @@
-#include <zimm/target.hpp>
-#include <zimm/third_party_target.hpp>
+#include <zimm/zimm.hpp>
 
 #include <filesystem>
 #include <format>
+#include <generator>
 #include <iostream>
-#include <map>
 #include <ranges>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 using namespace zimm;
+using namespace std::string_view_literals;
 
 namespace fs = std::filesystem;
 
 namespace
 {
 
-struct Expected
+struct TargetInfo
 {
-    std::string_view name;
     TargetType type;
-};
+    std::string_view name;
 
-// A dependency whose manifest an earlier row found and a later row's config references
-// (e.g. absl links GTest::gtest): fabricated into the later row's wrapper under `ns`.
-struct DepSpec
-{
-    std::string_view pkg; // key of the already-found manifest
-    std::string_view ns;  // cmake namespace its targets are exposed under
+    bool operator==(const TargetInfo &) const = default;
 };
 
 struct Package
 {
     std::string_view cmakeName;
     std::string_view cmakeArgs;
-    std::vector<Expected> expected;
-    std::vector<DepSpec> deps;
+    std::vector<TargetInfo> expectedTargets;
+    /* cmake namespace, cmake name */
+    std::vector<std::pair<std::string_view, std::string_view>> dependencies;
     std::string_view hints;
 };
 
-using TargetType::Executable, TargetType::StaticLibrary, TargetType::SharedLibrary,
-    TargetType::HeaderOnlyLibrary;
-
 const std::vector<Package> packages = {};
 
-// hwloc ships no CMake config; TBB's and Ceres's configs reference pkg-config's
-// PkgConfig::HWLOC imported target. Fabricated from the dnf-installed files
-// (lib64/libhwloc.so under /usr, includes in /usr/include — verified in container).
-ThirdPartyTargetManifest fabricate_hwloc()
+ThirdPartyTargetManifest make_hwloc_manifest()
 {
     ThirdPartyTarget *tpt = ThirdPartyTarget::make("hwloc", Directory::make("/usr"));
-    zimm::SharedLibrary *hwloc =
-        tpt->assume_shared_library("HWLOC", detail::RelativePath{"lib64/libhwloc.so"});
+    zimm::SharedLibrary *hwloc = tpt->assume_shared_library("HWLOC", "lib64/libhwloc.so");
     tpt->add_public_property(IncludeProperty{Directory::make("/usr/include")});
     return {tpt, {hwloc}};
 }
 
-// CGALConfig imports CGAL::CGAL_Qt6 only when Qt6 is found in the same CMake session
-// (Qt6 is not installed); all its CGAL_Qt6 creation sites are guarded, so a placeholder
-// with an empty interface satisfies the CGAL::CGAL_BasicViewer_Qt link reference.
 ThirdPartyTargetManifest fabricate_cgal_qt6_placeholder()
 {
     ThirdPartyTarget *tpt = ThirdPartyTarget::make("cgal_qt6_placeholder", Directory::make("/usr"));
@@ -69,113 +53,89 @@ ThirdPartyTargetManifest fabricate_cgal_qt6_placeholder()
     return {tpt, {qt6}};
 }
 
-// vtk-config's targets reference ~33 third-party targets it never find_package()s
-// (consumer-preload convention), so find_package(VTK) cannot configure — and ITK's
-// ITKVtkGlue module find_package(VTK)s internally with the same result. Hand-fabricate
-// the union of the VTK targets OpenCASCADE's visualization/draw targets (TKIVtk,
-// TKIVtkDraw) and ITK's imported ITKVtkGlue target reference.
-ThirdPartyTargetManifest fabricate_vtk()
+ThirdPartyTargetManifest make_vtk_manifest()
 {
     ThirdPartyTarget *tpt = ThirdPartyTarget::make("vtk", Directory::make("/usr"));
     std::vector<Target *> targets;
     for (std::string_view name : {"CommonCore", "FiltersGeneral", "IOImage", "ImagingCore",
                                   "ImagingSources", "InteractionStyle", "RenderingCore",
                                   "RenderingFreeType", "RenderingGL2PSOpenGL2", "RenderingOpenGL2"})
-        targets.push_back(tpt->assume_shared_library(
-            std::string{name}, detail::RelativePath{std::format("lib64/libvtk{}.so", name)}));
+        targets.push_back(
+            tpt->assume_shared_library(std::string{name}, std::format("lib64/libvtk{}.so", name)));
     tpt->add_public_property(IncludeProperty{Directory::make("/usr/include/vtk")});
     return {tpt, std::move(targets)};
 }
 
-struct Error
+TargetInfo convert(const Target *t) { return TargetInfo{t->type(), t->name()}; }
+std::string info_to_str(const TargetInfo &info)
 {
-    std::string stage;
-    std::string reason;
-};
-
-const Target *resolve(std::span<const Target *> materialized, const Expected &exp)
-{
-    for (const Target *t : materialized)
-        if (t->name() == exp.name && t->type() == exp.type) return t;
-    return nullptr;
+    return std::format("{}:{}", to_string(info.type), info.name);
 }
 
-void check_import(const ThirdPartyTargetManifest &manifest, std::string_view cmakeName)
+void check_found_matches_expectations(const ThirdPartyTargetManifest &manifest, const Package &pkg)
 {
-    if (!manifest.tpt())
-        throw Error{.stage = "import",
-                    .reason = std::format("empty manifest (configure or parse failed) — see "
-                                          "from_docker/.zimm_cmake_find/{}/configure.log for "
-                                          "the wrapper log of '{}' (zimm copies it out of the "
-                                          "container)",
-                                          cmakeName, cmakeName)};
-}
+    auto found =
+        manifest.targets() | std::views::transform(&convert) | std::ranges::to<std::vector>();
+    const auto &expected = pkg.expectedTargets;
 
-void check_targets(const ThirdPartyTargetManifest &manifest, const Package &pkg)
-{
-    auto assumedTargets = manifest.targets();
-    std::vector<std::string> missing;
+    std::vector<TargetInfo> missing;
+    for (const auto &e : expected)
+        if (std::ranges::find(found, e) == found.end()) missing.push_back(e);
 
-    for (const Expected &exp : pkg.expected)
-        if (!resolve(assumedTargets, exp))
-            missing.push_back(std::format("{} ({})", exp.name, to_string(exp.type)));
+    std::vector<TargetInfo> extra;
+    for (const auto &f : found)
+        if (std::ranges::find(expected, f) == expected.end()) extra.push_back(f);
 
-    if (!missing.empty())
-        throw Error{.stage = "targets",
-                    .reason =
-                        "missing: " + (missing | std::views::join_with(std::string_view{", "}) |
-                                       std::ranges::to<std::string>())};
-}
-
-// Inverse of check_targets: every materialized target must be expected. Catches the
-// strategy inventing targets the config does not expose (or name/type drift).
-void check_no_extras(const ThirdPartyTargetManifest &manifest, const Package &pkg)
-{
-    auto assumedTargets = manifest.targets();
-    std::vector<std::string> extras;
-
-    for (const Target *t : assumedTargets)
+    if (!missing.empty() || !extra.empty())
     {
-        bool known = false;
-        for (const Expected &exp : pkg.expected)
-            if (t->name() == exp.name && t->type() == exp.type)
-            {
-                known = true;
-                break;
-            }
-        if (!known) extras.push_back(std::format("{} ({})", t->name(), to_string(t->type())));
+        throw std::format(
+            "Missing Targets: [{:s}]; Extra Targets: [{:s}]",
+            missing | std::views::transform(info_to_str) | std::views::join_with(", "sv),
+            extra | std::views::transform(info_to_str) | std::views::join_with(", "sv));
+    }
+}
+
+std::generator<std::string> missing_paths(const Target *t)
+{
+    if (t->assumed_path())
+    {
+        auto &assumedPath = t->assumed_path()->path();
+        if (!fs::exists(assumedPath)) co_yield assumedPath.string();
     }
 
-    if (!extras.empty())
-        throw Error{.stage = "extras",
-                    .reason = "materialized but not expected: " +
-                              (extras | std::views::join_with(std::string_view{", "}) |
-                               std::ranges::to<std::string>())};
+    for (const auto &prop : std::views::concat(t->public_properties(), t->private_properties()))
+    {
+        if (prop->type() == PropertyType::Include)
+        {
+            auto includeProp = dynamic_cast<const IncludeProperty *>(prop.get());
+            auto &includePath = includeProp->include_path().path();
+            if (!fs::exists(includePath)) co_yield includePath.string();
+        }
+        else if (prop->type() == PropertyType::LinkTarget)
+        {
+            auto linkProp = dynamic_cast<const LinkTargetProperty *>(prop.get());
+            auto linkTarget = linkProp->link_lib();
+            if (!linkTarget->assumed_path())
+                throw std::format("LinkTarget='{}' of AssumedTarget='{}' is not assumed",
+                                  to_string(*linkTarget), to_string(*t));
+            auto &linkPath = linkTarget->assumed_path()->path();
+            if (!fs::exists(linkPath)) co_yield linkPath.string();
+        }
+    }
 }
 
-void check_paths(const ThirdPartyTargetManifest &manifest, const Package &pkg)
+void check_paths(const ThirdPartyTargetManifest &manifest)
 {
-    auto assumedTargets = manifest.targets();
-
     std::vector<std::string> badPaths;
-    for (const Expected &exp : pkg.expected)
-    {
-        if (exp.type == HeaderOnlyLibrary) continue;
 
-        const Target *t = resolve(assumedTargets, exp);
-        const auto &assumed = t->assumed_path();
-
-        if (!assumed || !fs::exists(assumed->path()))
-            badPaths.push_back(
-                std::format("{}: {}", t->name(),
-                            assumed ? assumed->path().string() : std::string{"no assumed path"}));
-    }
+    badPaths.append_range(missing_paths(manifest.tpt()));
+    for (const Target *t : manifest.targets()) badPaths.append_range(missing_paths(t));
 
     if (!badPaths.empty())
-        throw Error{.stage = "paths",
-                    .reason = "missing artifacts: " +
-                              (badPaths | std::views::join_with(std::string_view{", "}) |
-                               std::ranges::to<std::string>())};
+    {
+        throw std::format("Paths referenced but not found: [{:s}]",
+                          badPaths | std::views::join_with(", "sv));
+    }
 }
 
 int test_packages()
@@ -183,13 +143,13 @@ int test_packages()
     std::size_t passCount = 0, failCount = 0;
     std::vector<std::string> summary;
 
-    // Manifests rows can inject: hwloc (TBB/Ceres rows), the CGAL_Qt6 placeholder (CGAL
-    // row), the VTK targets OpenCASCADE's visualization targets reference (OpenCASCADE
-    // row), plus every row's own manifest once found (GTest row 3 feeds absl 10/gRPC 11).
-    std::map<std::string, ThirdPartyTargetManifest, std::less<>> found;
-    found.emplace("hwloc", fabricate_hwloc());
-    found.emplace("placeholder", fabricate_cgal_qt6_placeholder());
-    found.emplace("VTK", fabricate_vtk());
+    // some packages depend on others
+    // example: many packages depend on gtest, they can look up dependencies from here
+    // some packages like hwloc, VTK are not CMake packages so need to be constructed manually
+    std::unordered_map<std::string, ThirdPartyTargetManifest> manifests;
+    manifests.emplace("hwloc", make_hwloc_manifest());
+    manifests.emplace("placeholder", fabricate_cgal_qt6_placeholder());
+    manifests.emplace("VTK", make_vtk_manifest());
 
     for (const Package &pkg : packages)
     {
@@ -199,43 +159,37 @@ int test_packages()
 
         try
         {
-            std::vector<CmakeDependency> deps;
-            for (const DepSpec &spec : pkg.deps)
-            {
-                auto it = found.find(spec.pkg);
-                if (it == found.end())
-                {
-                    std::cout << std::format(
-                        "WARN  no manifest '{}' to inject — '{}' runs uninjected\n", spec.pkg,
-                        pkg.cmakeName);
-                    continue;
-                }
-                deps.push_back({std::string{spec.ns}, it->second});
-            }
-
+            auto cmakeDeps =
+                pkg.dependencies |
+                std::views::transform(
+                    [&](const auto &p)
+                    {
+                        auto iter = manifests.find(std::string{p.second});
+                        if (iter == manifests.end())
+                            throw std::format("cmake pkg='{}' requires missing dependency='{}::{}'",
+                                              pkg.cmakeName, p.first, p.second);
+                        return FindCmakePackageTptStrategy::Dependency{std::string{p.first},
+                                                                       iter->second};
+                    }) |
+                std::ranges::to<std::vector>();
             FindCmakePackageTptStrategy strategy{std::vector<Directory>{Directory::make("/usr")},
                                                  std::string{pkg.cmakeArgs}, "relwithdebinfo",
                                                  std::string{pkg.hints}};
-            auto manifest = strategy.attempt(pkg.cmakeName, deps);
-            found[std::string{pkg.cmakeName}] = manifest; // rows feed later rows
+            auto manifest = strategy.attempt(pkg.cmakeName, cmakeDeps);
+            manifests[std::string{pkg.cmakeName}] = manifest;
 
-            check_import(manifest, pkg.cmakeName);
-            check_targets(manifest, pkg);
-            check_no_extras(manifest, pkg);
-            check_paths(manifest, pkg);
+            if (!manifest.tpt()) throw std::format("import error: empty manifest");
+
+            check_found_matches_expectations(manifest, pkg);
+            check_paths(manifest);
 
             ++passCount;
-            std::string expectedNames = pkg.expected | std::views::transform(&Expected::name) |
-                                        std::views::join_with(std::string_view{", "}) |
-                                        std::ranges::to<std::string>();
-            summary.push_back(
-                std::format("PASS  {:<12} {:<8} {}", pkg.cmakeName, "-", expectedNames));
+            summary.push_back(std::format("PASS  {:<12} -", pkg.cmakeName));
         }
-        catch (const Error &e)
+        catch (const std::string &errStr)
         {
             ++failCount;
-            summary.push_back(
-                std::format("FAIL  {:<12} {:<8} {}", pkg.cmakeName, e.stage, e.reason));
+            summary.push_back(std::format("FAIL  {:<12} {}", pkg.cmakeName, errStr));
         }
     }
 

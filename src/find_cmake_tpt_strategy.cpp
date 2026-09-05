@@ -20,6 +20,8 @@ using namespace zimm;
 namespace
 {
 
+using CmakeDependency = FindCmakePackageTptStrategy::Dependency;
+
 bool contains_genex(std::string_view s) { return s.contains("$<"); }
 
 // $<LINK_ONLY:x> → x; anything else passes through unchanged.

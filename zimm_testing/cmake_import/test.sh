@@ -23,10 +23,10 @@ if [ "$CONNECT" = "true" ]; then
             echo "$?" > /tmp/test_rc
             sleep infinity
           '
-
     # wait for tests to finish and get return code
+    echo "Waiting for test to execute..."
     while [ -z "$(docker exec "$CONTAINER" cat /tmp/test_rc)" ]; do
-        sleep 1
+        sleep 1 2> /dev/null
     done
     rc=$(docker exec "$CONTAINER" cat /tmp/test_rc)
 else

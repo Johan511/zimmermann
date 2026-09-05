@@ -18,7 +18,7 @@ dnf -y --setopt=install_weak_deps=False --setopt=keepcache=True install \
     glfw-devel \
     raylib-devel \
     Box2D-devel \
-    qt6-qtbase-devel \
+    qt6-qtbase-private-devel \
     opencv-devel \
     poco-devel \
     tbb-devel \
