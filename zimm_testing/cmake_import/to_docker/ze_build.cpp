@@ -53,19 +53,6 @@ ThirdPartyTargetManifest fabricate_cgal_qt6_placeholder()
     return {tpt, {qt6}};
 }
 
-ThirdPartyTargetManifest make_vtk_manifest()
-{
-    ThirdPartyTarget *tpt = ThirdPartyTarget::make("vtk", Directory::make("/usr"));
-    std::vector<Target *> targets;
-    for (std::string_view name : {"CommonCore", "FiltersGeneral", "IOImage", "ImagingCore",
-                                  "ImagingSources", "InteractionStyle", "RenderingCore",
-                                  "RenderingFreeType", "RenderingGL2PSOpenGL2", "RenderingOpenGL2"})
-        targets.push_back(
-            tpt->assume_shared_library(std::string{name}, std::format("lib64/libvtk{}.so", name)));
-    tpt->add_public_property(IncludeProperty{Directory::make("/usr/include/vtk")});
-    return {tpt, std::move(targets)};
-}
-
 TargetInfo convert(const Target *t) { return TargetInfo{t->type(), t->name()}; }
 std::string info_to_str(const TargetInfo &info)
 {
@@ -145,11 +132,10 @@ int test_packages()
 
     // some packages depend on others
     // example: many packages depend on gtest, they can look up dependencies from here
-    // some packages like hwloc, VTK are not CMake packages so need to be constructed manually
+    // hwloc is not a CMake package (pkgconfig only), so it is constructed manually
     std::unordered_map<std::string, ThirdPartyTargetManifest> manifests;
     manifests.emplace("hwloc", make_hwloc_manifest());
     manifests.emplace("placeholder", fabricate_cgal_qt6_placeholder());
-    manifests.emplace("VTK", make_vtk_manifest());
 
     for (const Package &pkg : packages)
     {
