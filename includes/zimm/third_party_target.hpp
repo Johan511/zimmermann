@@ -153,7 +153,6 @@ class FindCmakePackageTptStrategy
     std::vector<Directory> m_searchDirs;
     std::string m_findPackageArgs;
     std::string m_buildType;
-    std::string m_findPackageHints;
 
 public:
     struct Dependency
@@ -163,15 +162,12 @@ public:
     };
 
     FindCmakePackageTptStrategy(Directory searchPath, std::string findPackageArgs = {},
-                                std::string buildType = "relwithdebinfo",
-                                std::string findPackageHints = {});
+                                std::string buildType = "relwithdebinfo");
     FindCmakePackageTptStrategy(std::vector<Directory> searchPaths,
                                 std::string findPackageArgs = {},
-                                std::string buildType = "relwithdebinfo",
-                                std::string findPackageHints = {});
+                                std::string buildType = "relwithdebinfo");
     FindCmakePackageTptStrategy(std::string findPackageArgs = {},
-                                std::string buildType = "relwithdebinfo",
-                                std::string findPackageHints = {});
+                                std::string buildType = "relwithdebinfo");
     ThirdPartyTargetManifest attempt(std::string_view name, std::span<Dependency> deps = {}) const;
 };
 

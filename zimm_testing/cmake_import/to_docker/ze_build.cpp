@@ -32,7 +32,7 @@ struct Package
     std::vector<TargetInfo> expectedTargets;
     /* cmake namespace, cmake name */
     std::vector<std::pair<std::string_view, std::string_view>> dependencies;
-    std::string_view hints;
+    std::vector<std::string> searchDirs;
 };
 
 const std::vector<Package> packages = {};
@@ -158,9 +158,10 @@ int test_packages()
                                                                        iter->second};
                     }) |
                 std::ranges::to<std::vector>();
-            FindCmakePackageTptStrategy strategy{std::vector<Directory>{Directory::make("/usr")},
-                                                 std::string{pkg.cmakeArgs}, "relwithdebinfo",
-                                                 std::string{pkg.hints}};
+            auto searchPaths = pkg.searchDirs | std::views::transform(&Directory::make) |
+                               std::ranges::to<std::vector>();
+            FindCmakePackageTptStrategy strategy{searchPaths, std::string{pkg.cmakeArgs},
+                                                 "relwithdebinfo"};
             auto manifest = strategy.attempt(pkg.cmakeName, cmakeDeps);
             manifests[std::string{pkg.cmakeName}] = manifest;
 

@@ -41,16 +41,6 @@ std::string strip_namespace(std::string_view name)
     return pos == std::string_view::npos ? std::string{name} : std::string{name.substr(pos + 2)};
 }
 
-std::string sanitize_pkg_name(std::string_view name)
-{
-    std::string safe;
-    for (char c : name)
-        safe += (std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == '.')
-                    ? c
-                    : '_';
-    return safe;
-}
-
 constexpr std::string_view cmake_build_type(std::string_view buildType)
 {
     static constexpr std::array map = {
@@ -204,7 +194,7 @@ struct ParsedCmakeResult
     std::vector<ImportedTarget> imported_targets;
 };
 
-std::optional<ParsedCmakeResult> parse_cmake_result(fs::path cmakeResultsFile)
+std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResultsFile)
 {
     std::ifstream in{cmakeResultsFile};
     if (!in)
@@ -687,71 +677,68 @@ void wire_usage(const std::vector<ImportedTarget> &tgts, const BuildResult &buil
     }
 }
 
-} // namespace
-
-namespace zimm
+std::optional<ParsedCmakeResult> run_cmake_cmd_and_parse_stdout(std::string_view cmakeCmd,
+                                                                const File &stdoutFile)
 {
-FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(Directory searchPath,
-                                                         std::string findPackageArgs,
-                                                         std::string buildType,
-                                                         std::string findPackageHints)
-    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType)),
-      m_findPackageHints(std::move(findPackageHints))
-{
-    m_searchDirs.push_back(std::move(searchPath));
-}
-
-FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(std::vector<Directory> searchPaths,
-                                                         std::string findPackageArgs,
-                                                         std::string buildType,
-                                                         std::string findPackageHints)
-    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType)),
-      m_findPackageHints(std::move(findPackageHints))
-{
-    for (auto &searchPath : searchPaths) m_searchDirs.push_back(std::move(searchPath));
-}
-
-FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(std::string findPackageArgs,
-                                                         std::string buildType,
-                                                         std::string findPackageHints)
-    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType)),
-      m_findPackageHints(std::move(findPackageHints))
-{
-}
-
-ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view name,
-                                                              std::span<CmakeDependency> deps) const
-{
-    Directory scratch =
-        Directory::make(std::format(".zimm_cmake_find/{}", sanitize_pkg_name(name)));
-
-    fs::remove_all(scratch.path());
-    fs::create_directories(scratch.path());
-
-    write_cmakeliststxt_file(name, m_findPackageArgs, scratch, deps);
-    const std::string cmakeCmd = cmake_cmd(scratch, m_buildType, m_searchDirs);
-
-    if (std::system(cmakeCmd.c_str()) != 0)
+    if (std::system(cmakeCmd.data()) != 0)
     {
         LOGI("cmake find_package run failed");
         return {};
     }
 
     // TODO: do we really need build type suffix?
-    const std::string varsFileName = std::format("vars_{}.txt", cmake_build_type(m_buildType));
-    fs::path varsFilePath = scratch.path() / varsFileName;
+    const auto &varsFilePath = stdoutFile.path();
     if (!fs::exists(varsFilePath))
     {
         LOGW("configure reported success but no vars_*.txt dump exists");
         return {};
     }
 
-    auto cmakeResultOpt = parse_cmake_result(std::move(varsFilePath));
+    return parse_cmake_result(varsFilePath);
+}
 
-    if (!cmakeResultOpt) return {};
-    auto cmakeResult = std::move(*cmakeResultOpt);
+} // namespace
 
-    if (cmakeResult.config.empty()) return {};
+namespace zimm
+{
+FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(Directory searchPath,
+                                                         std::string findPackageArgs,
+                                                         std::string buildType)
+    : m_searchDirs({searchPath}), m_findPackageArgs(std::move(findPackageArgs)),
+      m_buildType(std::move(buildType))
+{
+}
+
+FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(std::vector<Directory> searchPaths,
+                                                         std::string findPackageArgs,
+                                                         std::string buildType)
+    : m_searchDirs(std::from_range, std::move(searchPaths)),
+      m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType))
+{
+}
+
+FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(std::string findPackageArgs,
+                                                         std::string buildType)
+    : m_findPackageArgs(std::move(findPackageArgs)), m_buildType(std::move(buildType))
+{
+}
+
+ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view name,
+                                                              std::span<CmakeDependency> deps) const
+{
+    Directory scratch = Directory::make(std::format(".zimm_cmake_find/{}", name));
+
+    fs::remove_all(scratch.path());
+    fs::create_directories(scratch.path());
+
+    write_cmakeliststxt_file(name, m_findPackageArgs, scratch, deps);
+
+    std::optional<ParsedCmakeResult> cmakeResultOpt = run_cmake_cmd_and_parse_stdout(
+        cmake_cmd(scratch, m_buildType, m_searchDirs),
+        scratch.file(std::format("vars_{}.txt", cmake_build_type(m_buildType))));
+
+    if (!cmakeResultOpt || cmakeResultOpt->config.empty()) return {};
+    ParsedCmakeResult &cmakeResult = *cmakeResultOpt;
 
     Directory prefixDir = prefix_dir(cmakeResult);
     ThirdPartyTarget *tpt = ThirdPartyTarget::make(std::string{name}, prefixDir);
@@ -766,9 +753,7 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
     for (const std::string &linkLib : cmakeResult.libraries)
         tpt->add_public_property(LinkFlagProperty{normalize_lib_entry(linkLib)});
 
-    auto cmakeTargets = cmakeResult.imported_targets;
-    auto built = build_entries(cmakeTargets, cmakeResult.config, prefixDir);
-
+    auto built = build_entries(cmakeResult.imported_targets, cmakeResult.config, prefixDir);
     // Materialize the accepted entries under the TPT (manifest paths are always
     // relative to the tpt dir), split them for wire_usage, and report them in the
     // returned manifest.
@@ -794,7 +779,7 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
             if (depTarget->type() != TargetType::Executable)
                 injected.push_back(static_cast<Library *>(depTarget));
 
-    wire_usage(cmakeTargets, built, exes, libs, cmakeResult.config, injected);
+    wire_usage(cmakeResult.imported_targets, built, exes, libs, cmakeResult.config, injected);
     return {tpt, std::move(assumed)};
 }
 } // namespace zimm

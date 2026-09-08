@@ -36,24 +36,28 @@ def parse_deps(deps):
     items = [f'{{"{dep["ns"]}", "{dep["pkg"]}"}}' for dep in deps]
     return "{" + ", ".join(items) + "}"
 
-def targets_yml_to_cpp_str():
-    data = yaml.safe_load(TARGETS_YML.read_text(encoding="utf-8"))
+def parse_search_dirs(search_dirs):
+    items = [f'"{d}"' for d in search_dirs]
+    return "{" + ", ".join(items) + "}"
+
+def targets_yml_to_cpp_str(targets_yml):
+    data = yaml.safe_load(targets_yml.read_text(encoding="utf-8"))
     return ",\n    ".join(
-        '{"%s", "%s", %s, %s, "%s"}' % (
+        '{"%s", "%s", %s, %s, %s}' % (
             name,
             pkg.get("args", ""),
             parse_targets(pkg["targets"]),
             parse_deps(pkg.get("deps", [])),
-            pkg.get("hints", ""))
+            parse_search_dirs(pkg.get("search_dirs", [])))
         for name, pkg in data["packages"].items())
 
-def prepare_ze_build():
-    text = ZE_BUILD.read_text(encoding="utf-8")
+def prepare_ze_build(ze_build):
+    text = ze_build.read_text(encoding="utf-8")
     newText = re.sub(
         r"const std::vector<Package> packages = {};",
-        lambda _: f"const std::vector<Package> packages = {{{targets_yml_to_cpp_str()}}};",
+        lambda _: f"const std::vector<Package> packages = {{{targets_yml_to_cpp_str(TARGETS_YML)}}};",
         text, count=1, flags=re.S)
-    ZE_BUILD.write_text(newText, encoding="utf-8")
+    ze_build.write_text(newText, encoding="utf-8")
 
 
 def main() -> int:
@@ -61,7 +65,7 @@ def main() -> int:
         shutil.rmtree(BUILD)
     BUILD.mkdir(parents=True)
 
-    prepare_ze_build()
+    prepare_ze_build(ZE_BUILD)
 
     compileCmd = ["g++", str(ZE_BUILD), "-std=c++26", "-g",
              f"-I{ZIMM / 'include'}", f"-L{ZIMM / 'lib64'}", "-lzimmermann",

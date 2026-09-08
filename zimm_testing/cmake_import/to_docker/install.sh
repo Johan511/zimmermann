@@ -31,6 +31,7 @@ dnf $DNF_OPTS install \
     opencascade-devel \
     hwloc-devel \
     InsightToolkit-devel \
+    vxl-devel \
     gdcm-devel \
     libminc-devel \
     ceres-solver-devel \

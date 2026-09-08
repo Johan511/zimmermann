@@ -560,12 +560,84 @@ packages:
         ITKIOTransformMatlab, ITKKLMRegionGrowing, ITKVTK, ITKWatersheds, itklbfgs,
         ITKOptimizersv4, itkopenjpeg, ITKReview, ITKVideoCore, ITKVideoIO, ITKVtkGlue,
         gdcmjpeg8, gdcmjpeg12, gdcmjpeg16, gdcmmd5, socketxx, gdcmCommon, gdcmDICT,
-        gdcmDSED, gdcmIOD, gdcmMSFF, gdcmMEXD]
+        gdcmDSED, gdcmIOD, gdcmMSFF, gdcmMEXD, viskoresdiympi_nompi, cont, cont_testing,
+        worklet, filter_core, filter_clean_grid, filter_connected_components,
+        filter_vector_analysis, filter_mesh_info, filter_multi_block, filter_contour,
+        filter_geometry_refinement, filter_density_estimate, filter_entity_extraction,
+        filter_field_conversion, filter_field_transform, filter_flow, filter_image_processing,
+        filter_resampling, filter_uncertainty, filter_zfp, io, source, Core, OpenGL,
+        GLX, GLES2, GLES3, EGL, GLU, Vulkan, DBus, Gui, DmaBufServerBufferPlugin,
+        DrmEglServerBufferPlugin, QComposePlatformInputContextPlugin,
+        QEglFSEmulatorIntegrationPlugin, QEglFSIntegrationPlugin,
+        QEglFSKmsEglDeviceIntegrationPlugin, QEglFSKmsGbmIntegrationPlugin,
+        QEglFSX11IntegrationPlugin, QEvdevKeyboardPlugin, QEvdevMousePlugin,
+        QEvdevTabletPlugin, QEvdevTouchScreenPlugin, QGifPlugin, QGtk3ThemePlugin,
+        QICOPlugin, QIbusPlatformInputContextPlugin, QJpegPlugin, QLibInputPlugin,
+        QLinuxFbIntegrationPlugin, QMinimalEglIntegrationPlugin, QMinimalIntegrationPlugin,
+        QOffscreenIntegrationPlugin, QTsLibPlugin, QTuioTouchPlugin,
+        QVkKhrDisplayIntegrationPlugin, QVncIntegrationPlugin,
+        QWaylandBradientDecorationPlugin, QWaylandEglClientBufferPlugin,
+        QWaylandFullScreenShellV1IntegrationPlugin, QWaylandIntegrationPlugin,
+        QWaylandWlShellIntegrationPlugin, QWaylandXdgShellIntegrationPlugin,
+        QXcbEglIntegrationPlugin, QXcbGlxIntegrationPlugin, QXcbIntegrationPlugin,
+        QXdgDesktopPortalThemePlugin, ShmServerBufferPlugin, VulkanServerBufferPlugin,
+        Widgets, openxr_loader, OpenVR, THEORA, ENC, DEC, OGG, LibXml2, LibHaru, CGNS,
+        JsonCpp, hdf5, hdf5_hl, serialization, Sql, QIBaseDriverPlugin,
+        QMYSQLDriverPlugin, QODBCDriverPlugin, QPSQLDriverPlugin, QSQLiteDriverPlugin,
+        Network, QConnManNetworkInformationPlugin, QGlibNetworkInformationPlugin,
+        QNetworkManagerNetworkInformationPlugin, QTlsBackendCertOnlyPlugin,
+        QTlsBackendOpenSSLPlugin, Qml, LabsPlatformplugin, LabsStyleKitImplplugin,
+        LabsStyleKitplugin, LabsSynchronizerplugin, QmlNetworkplugin,
+        QuickControlsTestUtilsPrivateplugin, QuickTestplugin, effectsplugin,
+        labsanimationplugin, labsmodelsplugin, modelsplugin, particlesplugin,
+        qmlfolderlistmodelplugin, qmllocalstorageplugin, qmlplugin, qmlsettingsplugin,
+        qmlshapesplugin, qmlwavefrontmeshplugin, qmlxmllistmodelplugin,
+        qquicklayoutsplugin, qquickvectorimagehelpersplugin, qquickvectorimageplugin,
+        qtgraphicaleffectsplugin, qtgraphicaleffectsprivate, qtqmlcoreplugin,
+        qtquick2plugin, qtquickcontrols2basicstyleimplplugin,
+        qtquickcontrols2basicstyleplugin, qtquickcontrols2fluentwinui3styleimplplugin,
+        qtquickcontrols2fluentwinui3styleplugin, qtquickcontrols2fusionstyleimplplugin,
+        qtquickcontrols2fusionstyleplugin, qtquickcontrols2imaginestyleimplplugin,
+        qtquickcontrols2imaginestyleplugin, qtquickcontrols2implplugin,
+        qtquickcontrols2materialstyleimplplugin, qtquickcontrols2materialstyleplugin,
+        qtquickcontrols2plugin, qtquickcontrols2universalstyleimplplugin,
+        qtquickcontrols2universalstyleplugin, qtquickdialogs2quickimplplugin,
+        qtquickdialogsplugin, qtquickshapesdesignhelpersplugin, qtquicktemplates2plugin,
+        quicktooling, quickwindow, sharedimageplugin, workerscriptplugin,
+        QDebugMessageServiceFactoryPlugin, QLocalClientConnectionFactoryPlugin,
+        QQmlDebugServerFactoryPlugin, QQmlDebuggerServiceFactoryPlugin,
+        QQmlInspectorServiceFactoryPlugin, QQmlNativeDebugConnectorFactoryPlugin,
+        QQmlNativeDebugServiceFactoryPlugin, QQmlPreviewServiceFactoryPlugin,
+        QQmlProfilerServiceFactoryPlugin, QQuickEventReplayServiceFactoryPlugin,
+        QQuickProfilerAdapterFactoryPlugin, QTcpServerConnectionFactoryPlugin, QmlModels,
+        QmlWorkerScript, QmlMeta, Quick, OpenGLWidgets, LibPROJ, SQLite3, OpenSlide,
+        Freetype, Fontconfig, X11, ICE, SM, Xau, xcb, X11_xcb, xcb_composite,
+        xcb_damage, xcb_dpms, xcb_dri2, xcb_dri3, xcb_glx, xcb_present, xcb_randr,
+        xcb_record, xcb_render, xcb_res, xcb_screensaver, xcb_shape, xcb_shm, xcb_sync,
+        xcb_xf86dri, xcb_xfixes, xcb_xinerama, xcb_xinput, xcb_xkb, xcb_xtest, xcb_xvmc,
+        xcb_xv, Xcomposite, Xcursor, Xdmcp, Xext, Xfixes, Xft, Xi, Xinerama, xkbcommon,
+        xkbfile, Xpm, Xtst, Xrandr, Xrender, XRes, Xss, Xt, Xv, Python, EXPAT, LZMA,
+        LZ4, TIFF, ZLIB, PNG, JPEG, fmt, shared, double-conversion]
+      HeaderOnlyLibrary: [vectorization_flags, compiler_flags, developer_flags,
+        optionparser, viskoresdiy, diy_developer_flags, diy, lcl, loguru, filter,
+        lodepng, Threads, CLI11, Platform, GlobalConfig, GlobalConfigPrivate,
+        PlatformCommonInternal, PlatformModuleInternal, PlatformPluginInternal,
+        PlatformAppInternal, PlatformToolInternal, PlatformExampleInternal, WrapAtomic,
+        GL, WrapOpenGL, Headers, WrapVulkanHeaders, headers, boost,
+        diagnostic_definitions, disable_autolinking, dynamic_linking, _NetCDF, NetCDF,
+        HDF5, QmlIntegration, Xkb, Xutil, Module, Eigen3, utf8cpp, fmt-header-only,
+        pugixml, PEGTL, fast_float, nlohmann_json]
       Executable: [itkTestDriver, gdcmdump, gdcmdiff, gdcmraw, gdcmscanner, gdcmanon,
         gdcmclean, gdcmgendir, gdcmimg, gdcmconv, gdcmtar, gdcminfo, gdcmscu, gdcmxml,
-        gdcmpap3, gdcmpdf]
+        gdcmpap3, gdcmpdf, syncqt, moc, rcc, tracepointgen, tracegen,
+        cmake_automoc_parser, qlalr, qtpaths, androiddeployqt, androidtestrunner,
+        wasmdeployqt, qmake, qvkgen, uic, qdbuscpp2xml, qdbusxml2cpp, h5diff,
+        qmlaotstats, qmlcachegen, qmldom, qmllint, qmltc, qmltyperegistrar,
+        qmljsrootgen, qmlformat, qmlcontextpropertydump, qmlimportscanner, qmlprofiler,
+        qmltime, qmlplugindump, qmltestrunner, svgtoqml, Interpreter,
+        InterpreterMultiConfig]
     deps: [{ns: VTK, pkg: VTK}]
-    hints: -DITK_DIR=/usr/lib64/cmake/InsightToolkit -DITKVtkGlue_LOADED=1
+    search_dirs: [/usr/lib64/cmake/InsightToolkit]
   Ceres:
     targets:
       HeaderOnlyLibrary: [Threads, BLAS, LAPACK, Eigen]
@@ -573,6 +645,8 @@ packages:
         tbbmalloc_proxy, tbbbind_2_5, irml, gflags_shared, gflags_nothreads_shared,
         gflags, glog, ceres]
     deps: [{ns: PkgConfig, pkg: hwloc}]
+
+# no targets for bullet as it follows old style config, properties are added to ThirdPartyTarget
   Bullet:
     targets:
-      HeaderOnlyLibrary: [Bullet_libs]
+      {}
