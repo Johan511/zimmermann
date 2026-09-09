@@ -89,11 +89,11 @@ public:
                                     std::move(buildCmd)};
     }
 
-    Executable *assume_executable(std::string name, detail::RelativePath pathRelToTptDir);
-    StaticLibrary *assume_static_library(std::string name, detail::RelativePath pathRelToTptDir);
-    SharedLibrary *assume_shared_library(std::string name, detail::RelativePath pathRelToTptDir);
-    HeaderOnlyLibrary *assumed_ho_library(std::string name, detail::RelativePath pathRelToTptDir);
-    Target *assume_target(TargetType, std::string name, detail::RelativePath pathRelToTptDir);
+    Executable *assume_executable(std::string name, std::string path);
+    StaticLibrary *assume_static_library(std::string name, std::string path);
+    SharedLibrary *assume_shared_library(std::string name, std::string path);
+    HeaderOnlyLibrary *assume_ho_library(std::string name, std::string path);
+    Target *assume_target(TargetType, std::string name, std::string path);
 
     std::pair<std::vector<Executable *>, std::vector<Library *>>
     assume_manifest(const ThirdPartyTargetManifest &);

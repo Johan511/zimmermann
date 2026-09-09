@@ -79,56 +79,51 @@ ThirdPartyTarget::ThirdPartyTarget(std::string name, Directory dir, MetaBuildCmd
 {
 }
 
-Executable *ThirdPartyTarget::assume_executable(std::string name,
-                                                detail::RelativePath pathRelToTptDir)
+Executable *ThirdPartyTarget::assume_executable(std::string name, std::string path)
 {
     auto target = make_executable(std::move(name));
     add_dependency_rel(target, this);
-    target->m_assumedPath = m_dir.file(pathRelToTptDir);
+    target->m_assumedPath = File::make(m_dir.path() / std::move(path));
     return target;
 }
 
-StaticLibrary *ThirdPartyTarget::assume_static_library(std::string name,
-                                                       detail::RelativePath pathRelToTptDir)
+StaticLibrary *ThirdPartyTarget::assume_static_library(std::string name, std::string path)
 {
     auto target = make_static_library(std::move(name));
     add_dependency_rel(target, this);
-    target->m_assumedPath = m_dir.file(pathRelToTptDir);
+    target->m_assumedPath = File::make(m_dir.path() / std::move(path));
     return target;
 }
 
-SharedLibrary *ThirdPartyTarget::assume_shared_library(std::string name,
-                                                       detail::RelativePath pathRelToTptDir)
+SharedLibrary *ThirdPartyTarget::assume_shared_library(std::string name, std::string path)
 {
     auto target = make_shared_library(std::move(name));
     add_dependency_rel(target, this);
-    target->m_assumedPath = m_dir.file(pathRelToTptDir);
+    target->m_assumedPath = File::make(m_dir.path() / std::move(path));
     return target;
 }
 
-HeaderOnlyLibrary *ThirdPartyTarget::assumed_ho_library(std::string name,
-                                                        detail::RelativePath pathRelToTptDir)
+HeaderOnlyLibrary *ThirdPartyTarget::assume_ho_library(std::string name, std::string path)
 {
     auto target = make_header_only_library(std::move(name));
     add_dependency_rel(target, this);
-    // header-only targets have no artifact; the path names their include dir
-    target->add_public_property(IncludeProperty{m_dir.subdir(pathRelToTptDir)});
+    // header-only targets have assumed path; the path names their include dir
+    target->add_public_property(IncludeProperty{Directory::make(m_dir.path() / std::move(path))});
     return target;
 }
 
-Target *ThirdPartyTarget::assume_target(TargetType type, std::string name,
-                                        detail::RelativePath pathRelToTptDir)
+Target *ThirdPartyTarget::assume_target(TargetType type, std::string name, std::string path)
 {
     switch (type)
     {
     case TargetType::Executable:
-        return assume_executable(std::move(name), std::move(pathRelToTptDir));
+        return assume_executable(std::move(name), std::move(path));
     case TargetType::StaticLibrary:
-        return assume_static_library(std::move(name), std::move(pathRelToTptDir));
+        return assume_static_library(std::move(name), std::move(path));
     case TargetType::SharedLibrary:
-        return assume_shared_library(std::move(name), std::move(pathRelToTptDir));
+        return assume_shared_library(std::move(name), std::move(path));
     case TargetType::HeaderOnlyLibrary:
-        return assumed_ho_library(std::move(name), std::move(pathRelToTptDir));
+        return assume_ho_library(std::move(name), std::move(path));
     default:
         LOGE("ThirdPartyTarget::assume_target: unsupported TargetType " << to_string(type)
                                                                         << " for '" << name << "'");

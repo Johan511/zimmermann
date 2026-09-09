@@ -23,24 +23,6 @@ namespace
 
 using CmakeDependency = FindCmakePackageTptStrategy::Dependency;
 
-bool contains_genex(std::string_view s) { return s.contains("$<"); }
-
-// $<LINK_ONLY:x> → x; anything else passes through unchanged.
-std::string unwrap_link_only(std::string_view entry)
-{
-    static constexpr std::string_view PREFIX = "$<LINK_ONLY:";
-    if (entry.starts_with(PREFIX) && entry.ends_with('>'))
-        return std::string{entry.substr(PREFIX.size(), entry.size() - PREFIX.size() - 1)};
-    return std::string{entry};
-}
-
-// "my_lib::my_utils" → "my_utils". zimm target names must not contain "::".
-std::string strip_namespace(std::string_view name)
-{
-    auto pos = name.rfind("::");
-    return pos == std::string_view::npos ? std::string{name} : std::string{name.substr(pos + 2)};
-}
-
 constexpr std::string_view cmake_build_type(std::string_view buildType)
 {
     static constexpr std::array map = {
@@ -55,29 +37,6 @@ constexpr std::string_view cmake_build_type(std::string_view buildType)
 
     LOGF("Invalid build type = " << std::quoted(buildType) << " received");
     std::unreachable();
-}
-
-// CMake target TYPE → zimm TargetType; nullopt for types zimm can't represent.
-// UNKNOWN_LIBRARY (what find-modules and hand-written configs give UNKNOWN IMPORTED)
-// carries no type information — classify by resolved location: .a/.lib → static,
-// .so/.dylib/extensionless → shared, no location → header-only. A location alone
-// can't tell an executable from a library; every UNKNOWN target Fedora ships is a
-// library, so no /usr/bin heuristic until one actually shows up.
-std::optional<TargetType> zimm_type_of(std::string_view cmakeType, const std::string &location)
-{
-    if (cmakeType == "STATIC_LIBRARY") return TargetType::StaticLibrary;
-    if (cmakeType == "SHARED_LIBRARY" || cmakeType == "MODULE_LIBRARY")
-        return TargetType::SharedLibrary;
-    if (cmakeType == "EXECUTABLE") return TargetType::Executable;
-    if (cmakeType == "INTERFACE_LIBRARY") return TargetType::HeaderOnlyLibrary;
-    if (cmakeType == "UNKNOWN_LIBRARY")
-    {
-        if (location.empty()) return TargetType::HeaderOnlyLibrary;
-        const std::string ext = fs::path{location}.extension().string();
-        if (ext == ".a" || ext == ".lib") return TargetType::StaticLibrary;
-        return TargetType::SharedLibrary;
-    }
-    return std::nullopt;
 }
 
 std::string_view cmake_type_of(TargetType type)
@@ -124,7 +83,6 @@ Directory prefix_dir_of(const std::string &configPath)
     return Directory::make(p.string());
 }
 
-// Resolve an include dir that may be relative to the config file's directory.
 std::string resolve_against_config(std::string_view dir, std::string_view configPath)
 {
     namespace fs = std::filesystem;
@@ -139,8 +97,6 @@ std::string resolve_against_config(std::string_view dir, std::string_view config
     return p.string();
 }
 
-// Normalize a <Name>_LIBRARIES entry: -lX and paths pass through,
-// bare identifiers get -l prefixed.
 std::string normalize_lib_entry(std::string_view entry)
 {
     if (entry.empty()) return {};
@@ -151,26 +107,12 @@ std::string normalize_lib_entry(std::string_view entry)
     return std::format("-l{}", entry);
 }
 
-// Convert an absolute path to one relative to `base` (the tpt dir) — manifest
-// paths are always relative. Returns empty on failure.
-std::string to_relative(const std::string &absolutePath, const Directory &base)
-{
-    namespace fs = std::filesystem;
-    fs::path rel = fs::path{absolutePath}.lexically_relative(base.path());
-    if (rel.empty() || !rel.is_relative())
-    {
-        LOGW("FindCmakePackageTptStrategy: cannot express '" << absolutePath << "' relative to '"
-                                                             << base.path().string() << "'");
-        return {};
-    }
-    return rel.string();
-}
-
 struct ImportedTarget
 {
     std::string name;
     std::string type;
     std::string location;
+    // TODO: get rid of location fallback
     std::string location_fallback;
     std::string implib;
     std::string soname;
@@ -193,6 +135,25 @@ struct ParsedCmakeResult
 
     std::vector<ImportedTarget> imported_targets;
 };
+
+std::optional<ParsedCmakeResult> normalize(ParsedCmakeResult cmakeResult)
+{
+    for (ImportedTarget &iTgt : cmakeResult.imported_targets)
+    {
+        if (iTgt.location.empty()) iTgt.location = std::move(iTgt.location_fallback);
+
+        if (iTgt.type == "UNKNOWN_LIBRARY")
+        {
+            const std::string ext = fs::path{iTgt.location}.extension().string();
+
+            if (iTgt.location.empty()) iTgt.type = "INTERFACE_LIBRARY";
+            else if (ext == ".a" || ext == ".lib") iTgt.type = "STATIC_LIBRARY";
+            else if (ext == ".so" || ext == ".dll") iTgt.type = "SHARED_LIBRARY";
+        }
+    }
+
+    return cmakeResult;
+}
 
 std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResultsFile)
 {
@@ -228,6 +189,16 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
         return line.substr(eqPosn + 1);
     };
 
+    static constexpr auto parse_member = [](auto &member, std::string value)
+    {
+        using MemberType = std::remove_reference_t<decltype(member)>;
+        if constexpr (std::same_as<MemberType, std::string>) member = std::move(value);
+        else if constexpr (std::same_as<MemberType, std::vector<std::string>>)
+            member = std::move(value) | std::views::split(';') |
+                     std::ranges::to<std::vector<std::string>>();
+        else static_assert(false, "only std::string and std::vector<std::string> are supported");
+    };
+
     template for (constexpr auto member : std::define_static_array(meta::nonstatic_data_members_of(
                       ^^ParsedCmakeResult, meta::access_context::current())))
     {
@@ -238,15 +209,9 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
         else
         {
             auto value = parse_next(meta::identifier_of(member));
-            if (!value) return {};
+            if (!value) return std::nullopt;
 
-            if constexpr (std::same_as<MemberType, std::string>)
-                result.[:member:] = std::move(*value);
-            else if constexpr (std::same_as<MemberType, std::vector<std::string>>)
-                result.[:member:] = std::move(*value) | std::views::split(';') |
-                                    std::ranges::to<std::vector<std::string>>();
-            else
-                static_assert(false, "only std::string and std::vector<std::string> are supported");
+            parse_member(result.[:member:], std::move(*value));
         }
     }
 
@@ -261,21 +226,14 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
             if (!value)
             {
                 LOGE("CmakeResult: truncated target block");
-                return {};
+                return std::nullopt;
             }
 
-            using MemberType = typename[:meta::type_of(member):];
-            if constexpr (std::same_as<MemberType, std::string>)
-                importedTarget.[:member:] = std::move(*value);
-            else if constexpr (std::same_as<MemberType, std::vector<std::string>>)
-                importedTarget.[:member:] = std::move(*value) | std::views::split(';') |
-                                            std::ranges::to<std::vector<std::string>>();
-            else
-                static_assert(false, "only std::string and std::vector<std::string> are supported");
+            parse_member(importedTarget.[:member:], std::move(*value));
         }
     }
 
-    return result;
+    return normalize(std::move(result));
 }
 
 // TODO: get rid of conditionals in the wrapper
@@ -315,8 +273,8 @@ foreach(_tgt IN LISTS _imported)
   target_link_libraries("zimm_wrap_${{_i}}" INTERFACE "${{_tgt}}")
   string(APPEND _content "name=${{_tgt}}\n")
   string(APPEND _content "type=${{_type}}\n")
-  string(APPEND _content "location=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_LOCATION>\n")
-  string(APPEND _content "location_fallback=$<TARGET_PROPERTY:${{_tgt}},LOCATION>\n")
+  string(APPEND _content "location=$<TARGET_PROPERTY:${{_tgt}},LOCATION>\n")
+  string(APPEND _content "location_fallback=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_LOCATION>\n")
   string(APPEND _content "implib=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_IMPLIB>\n")
   string(APPEND _content "soname=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_SONAME>\n")
   string(APPEND _content "include_dirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_INCLUDE_DIRECTORIES>,;>\n")
@@ -339,30 +297,6 @@ endforeach()
 file(GENERATE OUTPUT "{2}/vars_$<CONFIG>.txt" CONTENT "${{_content}}")
 )CMAKELISTS";
 // clang-format on
-
-bool check_cmake_version(const Directory &scratch)
-{
-    // pre-check cmake presence + version so old-distro users get a real message
-    const std::string verFile = (scratch.path() / "cmake_version.txt").string();
-    std::system(std::format("cmake --version > {} 2>&1", verFile).c_str());
-    std::ifstream in{verFile};
-    std::string line;
-    int major = 0, minor = 0;
-    if (std::getline(in, line)) std::sscanf(line.c_str(), "cmake version %d.%d", &major, &minor);
-    if (major == 0)
-    {
-        LOGE("`cmake` not found on PATH — cannot find CMake packages; falling through");
-        return false;
-    }
-    if (major < 3 || (major == 3 && minor < 25))
-    {
-        LOGE("zimm find-cmake needs cmake >= 3.25, found " << major << "." << minor
-                                                           << " — falling through");
-        return false;
-    }
-
-    return true;
-}
 
 void target_to_cmake(std::string_view cmakeNamespace, const Target *t, std::ostringstream &oss)
 {
@@ -462,221 +396,6 @@ Directory prefix_dir(const ParsedCmakeResult &result)
     return result.config.empty() ? Directory::make(".") : prefix_dir_of(result.config);
 }
 
-// One materializable entry: target kind, zimm name, and a path relative to the TPT
-// dir (the artifact for located targets, the include dir for header-only ones — "."
-// when a header-only target carries no include dir).
-struct Entry
-{
-    TargetType type;
-    std::string name;
-    std::string path;
-};
-
-// Validate one parsed CMake target and compute its manifest entry (path relative to
-// prefixDir). All skip-decisions and their diagnostics live here.
-std::optional<Entry> entry_of(const ImportedTarget &tgt, std::set<std::string> &seenNames,
-                              const std::string &configPath, const Directory &prefixDir)
-{
-    const std::string zimmName = strip_namespace(tgt.name);
-    if (!seenNames.insert(zimmName).second)
-    {
-        LOGW("target name '" << zimmName << "' (from '" << tgt.name
-                             << "') collides with an already-populated target — skipping");
-        return std::nullopt;
-    }
-
-    // resolve the location up front: UNKNOWN_LIBRARY classifies by it, and located
-    // types need it for their manifest path — one rule (location, else fallback), no drift
-    const std::string location = !tgt.location.empty() ? tgt.location : tgt.location_fallback;
-
-    auto zimmType = zimm_type_of(tgt.type, location);
-    if (!zimmType)
-    {
-        LOGW("unsupported imported target type '" << tgt.type << "' for '" << tgt.name
-                                                  << "' — skipping");
-        return std::nullopt;
-    }
-
-    std::string rel;
-    if (*zimmType == TargetType::HeaderOnlyLibrary)
-    {
-        // INTERFACE targets are retained even when they carry no include dirs: their
-        // purpose may be flags only (Boost's dynamic_linking, HPX's flag interfaces,
-        // Threads::Threads), and CMake semantics keep the target regardless — dropping
-        // it would strand every link reference to it. The manifest path is cosmetic
-        // for header-only targets: the first include dir relative to the prefix when
-        // one exists, "." otherwise.
-        if (tgt.include_dirs.empty()) rel = ".";
-        else rel = to_relative(resolve_against_config(tgt.include_dirs[0], configPath), prefixDir);
-        if (rel.empty()) rel = "."; // include dir outside the prefix — retain regardless
-    }
-    else
-    {
-        if (location.empty())
-        {
-            LOGW("imported target '" << tgt.name
-                                     << "' has no location — check the "
-                                        "package's IMPORTED_CONFIGURATIONS or pass buildType=");
-            return std::nullopt;
-        }
-        rel = to_relative(location, prefixDir);
-    }
-    if (rel.empty()) return std::nullopt;
-
-    return Entry{*zimmType, zimmName, std::move(rel)};
-}
-
-struct BuildResult
-{
-    std::vector<Entry> entries;
-    std::vector<bool> accepted; // parallel to the input targets
-};
-
-BuildResult build_entries(const std::vector<ImportedTarget> &tgts, const std::string &configPath,
-                          const Directory &prefixDir)
-{
-    BuildResult out;
-    std::set<std::string> seenNames;
-    for (const auto &tgt : tgts)
-        if (auto entry = entry_of(tgt, seenNames, configPath, prefixDir))
-        {
-            out.accepted.push_back(true);
-            out.entries.push_back(std::move(*entry));
-        }
-        else out.accepted.push_back(false);
-    return out;
-}
-
-// The six usage-requirement loops differ only in field, wrapper prefix, property kind,
-// and whether the value resolves against the config file's directory.
-struct UsageField
-{
-    std::vector<std::string> ImportedTarget::*field;
-    char kind;               // 'I' → IncludeProperty, 'c' → compile flag, 'l' → link flag
-    std::string_view prefix; // prepended to the value
-    bool resolveAgainstConfig;
-    bool warnOnGenex;
-};
-
-constexpr UsageField USAGE_FIELDS[] = {
-    {&ImportedTarget::include_dirs, 'I', "", true, true},
-    {&ImportedTarget::system_include_dirs, 'c', "-isystem ", true, false},
-    {&ImportedTarget::defs, 'c', "-D", false, false},
-    {&ImportedTarget::compile_opts, 'c', "", false, false},
-    {&ImportedTarget::link_dirs, 'l', "-L", true, false},
-    {&ImportedTarget::link_opts, 'l', "", false, false},
-};
-
-void apply_usage(Target &target, const ImportedTarget &tgt, const std::string &configPath)
-{
-    for (const auto &f : USAGE_FIELDS)
-        for (const auto &v : tgt.*f.field)
-        {
-            if (contains_genex(v))
-            {
-                if (f.warnOnGenex)
-                    LOGW("INCLUDE_DIRS of '" << tgt.name
-                                             << "' contains an unresolved "
-                                                "generator expression — dropped: "
-                                             << v);
-                continue;
-            }
-            std::string value = f.resolveAgainstConfig ? resolve_against_config(v, configPath) : v;
-            switch (f.kind)
-            {
-            case 'I':
-                target.add_public_property(IncludeProperty{Directory::make(std::move(value))});
-                break;
-            case 'c':
-                target.add_public_property(CompileFlagProperty{std::string{f.prefix} + value});
-                break;
-            case 'l':
-                target.add_public_property(LinkFlagProperty{std::string{f.prefix} + value});
-                break;
-            }
-        }
-}
-
-void apply_link_entries(Target &target, const ImportedTarget &tgt,
-                        const std::map<std::string, Target *, std::less<>> &byName)
-{
-    for (const auto &ref : tgt.link_libs_direct)
-    {
-        std::string entry = unwrap_link_only(ref);
-        if (contains_genex(entry))
-        {
-            LOGW("unresolvable INTERFACE_LINK_LIBRARIES entry '" << ref << "' of '" << tgt.name
-                                                                 << "' — dropped");
-            continue;
-        }
-        auto depIt = byName.find(strip_namespace(entry));
-        if (depIt == byName.end())
-        {
-            // a namespaced ref is a CMake target reference; without an injected (or
-            // package-owned) target behind it it must not degrade into a raw link flag
-            if (entry.contains("::"))
-                LOGW("INTERFACE_LINK_LIBRARIES entry '" << ref << "' of '" << tgt.name
-                                                        << "' references unknown target '" << entry
-                                                        << "' — dropped");
-            else target.add_public_property(LinkFlagProperty{entry});
-            continue;
-        }
-        Target *dep = depIt->second;
-        if (dep->type() == TargetType::Executable)
-        {
-            // executables are not Library*; link by path
-            target.add_public_property(LinkFlagProperty{dep->assumed_path()->path().string()});
-        }
-        else if (dep->type() == TargetType::HeaderOnlyLibrary)
-        {
-            // nothing to link: the header-only dep's usage requirements already arrived
-            // through this target's own resolved dump; no edge needed
-        }
-        else if (target.type() == TargetType::HeaderOnlyLibrary)
-        {
-            // header-only consumers have no link_with; link by path
-            target.add_public_property(LinkFlagProperty{dep->assumed_path()->path().string()});
-            LOGW("header-only target '" << tgt.name << "' links '" << entry
-                                        << "' by path (header-only targets have no link edges)");
-        }
-        else
-        {
-            // cross-cast: LinkTrait is a sibling base of Target under Static/Shared/Executable
-            dynamic_cast<detail::LinkTrait *>(&target)->link_with(public_,
-                                                                  static_cast<Library *>(dep));
-        }
-    }
-}
-
-// Pass 2: attach usage requirements to the materialized targets. `injected` are the
-// dependency targets fabricated into the wrapper — seeded LAST so a package's own
-// targets win name collisions (intra-package refs like OCCT::TKernel must hit the
-// package's own targets, not an injected one).
-void wire_usage(const std::vector<ImportedTarget> &tgts, const BuildResult &built,
-                const std::vector<Executable *> &exes, const std::vector<Library *> &libs,
-                const std::string &configPath, std::span<Library *const> injected)
-{
-    std::map<std::string, Target *, std::less<>> byName;
-    for (auto *e : exes) byName.emplace(e->name(), e);
-    for (auto *l : libs) byName.emplace(l->name(), l);
-    for (Library *inj : injected) byName.emplace(inj->name(), inj);
-
-    for (size_t i = 0; i < tgts.size(); ++i)
-    {
-        if (!built.accepted[i]) continue;
-        Target *target = byName.at(strip_namespace(tgts[i].name));
-
-        if (target->type() != TargetType::HeaderOnlyLibrary && tgts[i].include_dirs.empty())
-            LOGW("target '" << tgts[i].name
-                            << "' has a library location but no "
-                               "include directories — the package's config may be hand-written "
-                               "with unresolved $<INSTALL_INTERFACE:...> (broken under CMake too)");
-
-        apply_usage(*target, tgts[i], configPath);
-        apply_link_entries(*target, tgts[i], byName);
-    }
-}
-
 std::optional<ParsedCmakeResult> run_cmake_cmd_and_parse_stdout(std::string_view cmakeCmd,
                                                                 const File &stdoutFile)
 {
@@ -687,15 +406,71 @@ std::optional<ParsedCmakeResult> run_cmake_cmd_and_parse_stdout(std::string_view
     }
 
     // TODO: do we really need build type suffix?
-    const auto &varsFilePath = stdoutFile.path();
-    if (!fs::exists(varsFilePath))
+    const auto &stdoutPath = stdoutFile.path();
+    if (!fs::exists(stdoutPath))
     {
         LOGW("configure reported success but no vars_*.txt dump exists");
         return {};
     }
 
-    return parse_cmake_result(varsFilePath);
+    return parse_cmake_result(stdoutPath);
 }
+
+void wire_props(const ImportedTarget &iTgt, Target *t)
+{
+    // TODO: relativeness of these paths?
+
+    for (const auto &incDir : iTgt.include_dirs)
+        t->add_public_property(IncludeProperty{Directory::make(incDir)});
+
+    // TODO: add system include property
+    for (const auto &incDir : iTgt.include_dirs)
+        t->add_public_property(CompileFlagProperty{std::format("-isystem {}", incDir)});
+
+    for (const auto &def : iTgt.defs)
+        t->add_public_property(CompileFlagProperty{std::format("-D{}", def)});
+
+    t->add_public_property(CompileFlagProperty{iTgt.compile_opts | std::views::join_with(' ') |
+                                               std::ranges::to<std::string>()});
+
+    for (const auto &linkDir : iTgt.link_dirs)
+        t->add_public_property(LinkFlagProperty{std::format("-L{}", linkDir)});
+
+    t->add_public_property(LinkFlagProperty{iTgt.link_opts | std::views::join_with(' ') |
+                                            std::ranges::to<std::string>()});
+
+    // TODO: do we need to figure out the full name (libzimmermann.so vs zimmermann)
+    for (const auto &linkLib : iTgt.link_libs_direct)
+        t->add_public_property(LinkFlagProperty{std::format("-l{}", linkLib)});
+}
+
+class Zimmify
+{
+    ThirdPartyTarget &tpt;
+
+public:
+    Zimmify(ThirdPartyTarget &tpt) : tpt(tpt) {}
+
+    Target *operator()(const ImportedTarget &iTgt)
+    {
+        Target *target{};
+        // TODO: sanitize parsed_cmake_result instead of dealing with this UNKNOWN_LIBRARY
+        // sanitize instead of dealing with location is rel or abs, location or location fallback
+
+        if (iTgt.type == "STATIC_LIBRARY")
+            target = tpt.assume_static_library(iTgt.name, iTgt.location);
+        else if (iTgt.type == "SHARED_LIBRARY" || iTgt.type == "MODULE_LIBRARY")
+            target = tpt.assume_shared_library(iTgt.name, iTgt.location);
+        else if (iTgt.type == "INTERFACE_LIBRARY")
+            target = tpt.assume_ho_library(iTgt.name, iTgt.location);
+        else if (iTgt.type == "EXECUTABLE")
+            target = tpt.assume_executable(iTgt.name, iTgt.location);
+        else LOGF("Target of cmakeType=" << std::quoted(iTgt.type) << ", not supported");
+
+        wire_props(iTgt, target);
+        return target;
+    }
+};
 
 } // namespace
 
@@ -741,6 +516,7 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
     ParsedCmakeResult &cmakeResult = *cmakeResultOpt;
 
     Directory prefixDir = prefix_dir(cmakeResult);
+
     ThirdPartyTarget *tpt = ThirdPartyTarget::make(std::string{name}, prefixDir);
 
     // add properties from old style config to tpt
@@ -753,33 +529,11 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
     for (const std::string &linkLib : cmakeResult.libraries)
         tpt->add_public_property(LinkFlagProperty{normalize_lib_entry(linkLib)});
 
-    auto built = build_entries(cmakeResult.imported_targets, cmakeResult.config, prefixDir);
-    // Materialize the accepted entries under the TPT (manifest paths are always
-    // relative to the tpt dir), split them for wire_usage, and report them in the
-    // returned manifest.
-    std::vector<Target *> assumed;
-    std::vector<Executable *> exes;
-    std::vector<Library *> libs;
-    for (const auto &entry : built.entries)
-    {
-        Target *target =
-            tpt->assume_target(entry.type, entry.name, detail::RelativePath{entry.path});
-        assumed.push_back(target);
-        if (target->type() == TargetType::Executable)
-            exes.push_back(static_cast<Executable *>(target));
-        else libs.push_back(static_cast<Library *>(target));
-    }
+    auto zimmTargets = cmakeResult.imported_targets | std::views::transform(Zimmify{*tpt}) |
+                       std::ranges::to<std::vector>();
 
-    // Injected dependency targets only capture link references the package doesn't
-    // resolve itself; they are never dumped, never enter built/exes/libs, and stay out
-    // of the returned manifest — the user keeps the dep manifests alive.
-    std::vector<Library *> injected;
-    for (CmakeDependency &dep : deps)
-        for (Target *depTarget : dep.manifest.targets())
-            if (depTarget->type() != TargetType::Executable)
-                injected.push_back(static_cast<Library *>(depTarget));
+    for (Target *t : zimmTargets) add_dependency_rel(tpt, t);
 
-    wire_usage(cmakeResult.imported_targets, built, exes, libs, cmakeResult.config, injected);
-    return {tpt, std::move(assumed)};
+    return {tpt, std::move(zimmTargets)};
 }
 } // namespace zimm
