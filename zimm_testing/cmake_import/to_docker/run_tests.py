@@ -33,7 +33,7 @@ def parse_targets(targets):
     return "{" + ", ".join(items) + "}"
 
 def parse_deps(deps):
-    items = [f'{{"{dep["ns"]}", "{dep["pkg"]}"}}' for dep in deps]
+    items = [f'"{dep}"' for dep in deps]
     return "{" + ", ".join(items) + "}"
 
 def parse_search_dirs(search_dirs):

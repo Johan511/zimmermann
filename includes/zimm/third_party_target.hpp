@@ -155,11 +155,7 @@ class FindCmakePackageTptStrategy
     std::string m_buildType;
 
 public:
-    struct Dependency
-    {
-        std::string cmakeNamespace;
-        ThirdPartyTargetManifest manifest;
-    };
+    using Dependency = ThirdPartyTargetManifest;
 
     FindCmakePackageTptStrategy(Directory searchPath, std::string findPackageArgs = {},
                                 std::string buildType = "relwithdebinfo");

@@ -30,8 +30,7 @@ struct Package
     std::string_view cmakeName;
     std::string_view cmakeArgs;
     std::vector<TargetInfo> expectedTargets;
-    /* cmake namespace, cmake name */
-    std::vector<std::pair<std::string_view, std::string_view>> dependencies;
+    std::vector<std::string_view> dependencies;
     std::vector<std::string> searchDirs;
 };
 
@@ -40,7 +39,8 @@ const std::vector<Package> packages = {};
 ThirdPartyTargetManifest make_hwloc_manifest()
 {
     ThirdPartyTarget *tpt = ThirdPartyTarget::make("hwloc", Directory::make("/usr"));
-    zimm::SharedLibrary *hwloc = tpt->assume_shared_library("HWLOC", "lib64/libhwloc.so");
+    zimm::SharedLibrary *hwloc =
+        tpt->assume_shared_library("PkgConfig::HWLOC", "lib64/libhwloc.so");
     tpt->add_public_property(IncludeProperty{Directory::make("/usr/include")});
     return {tpt, {hwloc}};
 }
@@ -48,7 +48,7 @@ ThirdPartyTargetManifest make_hwloc_manifest()
 ThirdPartyTargetManifest fabricate_cgal_qt6_placeholder()
 {
     ThirdPartyTarget *tpt = ThirdPartyTarget::make("cgal_qt6_placeholder", Directory::make("/usr"));
-    zimm::HeaderOnlyLibrary *qt6 = make_header_only_library("CGAL_Qt6");
+    zimm::HeaderOnlyLibrary *qt6 = make_header_only_library("CGAL::CGAL_Qt6");
     add_dependency_rel(qt6, tpt);
     return {tpt, {qt6}};
 }
@@ -135,7 +135,7 @@ int test_packages()
     // hwloc is not a CMake package (pkgconfig only), so it is constructed manually
     std::unordered_map<std::string, ThirdPartyTargetManifest> manifests;
     manifests.emplace("hwloc", make_hwloc_manifest());
-    manifests.emplace("placeholder", fabricate_cgal_qt6_placeholder());
+    manifests.emplace("cgal_qt6_placeholder", fabricate_cgal_qt6_placeholder());
 
     for (const Package &pkg : packages)
     {
@@ -148,14 +148,13 @@ int test_packages()
             auto cmakeDeps =
                 pkg.dependencies |
                 std::views::transform(
-                    [&](const auto &p)
+                    [&](std::string_view cmakeName)
                     {
-                        auto iter = manifests.find(std::string{p.second});
+                        auto iter = manifests.find(std::string{cmakeName});
                         if (iter == manifests.end())
-                            throw std::format("cmake pkg='{}' requires missing dependency='{}::{}'",
-                                              pkg.cmakeName, p.first, p.second);
-                        return FindCmakePackageTptStrategy::Dependency{std::string{p.first},
-                                                                       iter->second};
+                            throw std::format("cmake pkg='{}' requires missing dependency='{}'",
+                                              pkg.cmakeName, cmakeName);
+                        return FindCmakePackageTptStrategy::Dependency{iter->second};
                     }) |
                 std::ranges::to<std::vector>();
             auto searchPaths = pkg.searchDirs | std::views::transform(&Directory::make) |

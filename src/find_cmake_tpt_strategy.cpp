@@ -2,15 +2,11 @@
 #include "zimm/third_party_target.hpp"
 
 #include <array>
-#include <cctype>
-#include <cstdio>
 #include <fstream>
 #include <generator>
-#include <map>
 #include <meta>
 #include <optional>
 #include <ranges>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -102,7 +98,7 @@ std::string normalize_lib_entry(std::string_view entry)
     if (entry.empty()) return {};
     if (entry.starts_with("-l")) return std::string{entry};
     if (entry.find('/') != std::string_view::npos) return std::string{entry}; // path-ish
-    LOGW("FindCmakePackageTptStrategy: bare library name '" << entry << "' normalized to '-l"
+    LOGI("FindCmakePackageTptStrategy: bare library name '" << entry << "' normalized to '-l"
                                                             << entry << "'");
     return std::format("-l{}", entry);
 }
@@ -112,8 +108,6 @@ struct ImportedTarget
     std::string name;
     std::string type;
     std::string location;
-    // TODO: get rid of location fallback
-    std::string location_fallback;
     std::string implib;
     std::string soname;
     std::vector<std::string> include_dirs;
@@ -140,8 +134,6 @@ std::optional<ParsedCmakeResult> normalize(ParsedCmakeResult cmakeResult)
 {
     for (ImportedTarget &iTgt : cmakeResult.imported_targets)
     {
-        if (iTgt.location.empty()) iTgt.location = std::move(iTgt.location_fallback);
-
         if (iTgt.type == "UNKNOWN_LIBRARY")
         {
             const std::string ext = fs::path{iTgt.location}.extension().string();
@@ -274,7 +266,7 @@ foreach(_tgt IN LISTS _imported)
   string(APPEND _content "name=${{_tgt}}\n")
   string(APPEND _content "type=${{_type}}\n")
   string(APPEND _content "location=$<TARGET_PROPERTY:${{_tgt}},LOCATION>\n")
-  string(APPEND _content "location_fallback=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_LOCATION>\n")
+  # string(APPEND _content "location_fallback=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_LOCATION>\n")
   string(APPEND _content "implib=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_IMPLIB>\n")
   string(APPEND _content "soname=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_SONAME>\n")
   string(APPEND _content "include_dirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_INCLUDE_DIRECTORIES>,;>\n")
@@ -298,7 +290,7 @@ file(GENERATE OUTPUT "{2}/vars_$<CONFIG>.txt" CONTENT "${{_content}}")
 )CMAKELISTS";
 // clang-format on
 
-void target_to_cmake(std::string_view cmakeNamespace, const Target *t, std::ostringstream &oss)
+void target_to_cmake(const Target *t, std::ostringstream &oss)
 {
     /*
         add_library({cmakeName} {libType} IMPORTED) # or add_executable
@@ -306,9 +298,7 @@ void target_to_cmake(std::string_view cmakeNamespace, const Target *t, std::ostr
         set_target_properties({cmakeName} PROPERTIES IMPORTED_LOCATION {location})
         set_target_properties({cmakeName} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES {includeDirs})...
     */
-    const std::string cmakeName = cmakeNamespace.empty()
-                                      ? std::string{t->name()}
-                                      : std::format("{}::{}", cmakeNamespace, t->name());
+    const std::string_view cmakeName = t->name();
 
     // TODO: this only works if depedencies of third party target themselves are assumed
     // But that needn't be the case,
@@ -353,7 +343,7 @@ std::string define_dependencies(std::span<const CmakeDependency> deps)
 {
     std::ostringstream oss;
     for (const CmakeDependency &dep : deps)
-        for (const Target *t : dep.manifest.targets()) target_to_cmake(dep.cmakeNamespace, t, oss);
+        for (const Target *t : dep.targets()) target_to_cmake(t, oss);
     return std::move(oss).str();
 }
 
@@ -380,14 +370,6 @@ void write_cmakeliststxt_file(std::string_view name, std::string_view findPackag
     std::ofstream ofs{scratchDir.file("CMakeLists.txt").path()};
     ofs << cmakeFileContent;
 }
-
-// ---- population engine -------------------------------------------------------
-//
-// One pipeline shared by both config styles:
-//   select_targets — the ImportedTargets to materialize (old-style configs get ONE
-//                    synthesized header-only carrier "<name>_libs")
-//   build_entries  — validate each target and compute its manifest entry (pass 1)
-//   wire_usage     — attach usage requirements to the materialized targets (pass 2)
 
 Directory prefix_dir(const ParsedCmakeResult &result)
 {
@@ -454,8 +436,6 @@ public:
     Target *operator()(const ImportedTarget &iTgt)
     {
         Target *target{};
-        // TODO: sanitize parsed_cmake_result instead of dealing with this UNKNOWN_LIBRARY
-        // sanitize instead of dealing with location is rel or abs, location or location fallback
 
         if (iTgt.type == "STATIC_LIBRARY")
             target = tpt.assume_static_library(iTgt.name, iTgt.location);
@@ -465,7 +445,12 @@ public:
             target = tpt.assume_ho_library(iTgt.name, iTgt.location);
         else if (iTgt.type == "EXECUTABLE")
             target = tpt.assume_executable(iTgt.name, iTgt.location);
-        else LOGF("Target of cmakeType=" << std::quoted(iTgt.type) << ", not supported");
+        else
+        {
+            LOGE("Target=" << std::quoted(iTgt.name) << " of cmakeType=" << std::quoted(iTgt.type)
+                           << ", not supported");
+            return nullptr;
+        }
 
         wire_props(iTgt, target);
         return target;
@@ -530,6 +515,7 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
         tpt->add_public_property(LinkFlagProperty{normalize_lib_entry(linkLib)});
 
     auto zimmTargets = cmakeResult.imported_targets | std::views::transform(Zimmify{*tpt}) |
+                       std::views::filter(std::identity{}) /* filter out nullptr */ |
                        std::ranges::to<std::vector>();
 
     for (Target *t : zimmTargets) add_dependency_rel(tpt, t);
