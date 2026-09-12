@@ -3,6 +3,7 @@
 #include "logger.hpp"
 #include <concepts>
 #include <filesystem>
+#include <format>
 #include <iomanip>
 #include <source_location>
 #include <string>

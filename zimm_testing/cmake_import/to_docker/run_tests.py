@@ -53,10 +53,13 @@ def targets_yml_to_cpp_str(targets_yml):
 
 def prepare_ze_build(ze_build):
     text = ze_build.read_text(encoding="utf-8")
-    newText = re.sub(
+    newText, n = re.subn(
         r"const std::vector<Package> packages = {};",
         lambda _: f"const std::vector<Package> packages = {{{targets_yml_to_cpp_str(TARGETS_YML)}}};",
         text, count=1, flags=re.S)
+    if n != 1:
+        sys.exit(f"FAIL  ze_build.cpp template drift: 'const std::vector<Package> packages = {{}};' "
+                 f"not found — ze_build.cpp may already be rewritten or reformatted")
     ze_build.write_text(newText, encoding="utf-8")
 
 

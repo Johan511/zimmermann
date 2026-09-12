@@ -296,7 +296,13 @@ void target_to_cmake(const Target *t, std::ostringstream &oss)
         add_library({cmakeName} {libType} IMPORTED) # or add_executable
         set_target_properties({cmakeName} PROPERTIES ZIMM_INJECTED TRUE)
         set_target_properties({cmakeName} PROPERTIES IMPORTED_LOCATION {location})
-        set_target_properties({cmakeName} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES {includeDirs})...
+        set_target_properties({cmakeName} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES {includeDirs})
+        set_target_properties({cmakeName} PROPERTIES INTERFACE_COMPILE_OPTIONS {compileFlags})
+        set_target_properties({cmakeName} PROPERTIES INTERFACE_LINK_LIBRARIES {linkFlags})
+
+        If the found package's own find chain keeps the stub (e.g. FindThreads'
+        `if(NOT TARGET Threads::Threads)` guard), the stub is the only definition in play —
+        so it must carry the dep's full usage requirements, not just its include dirs.
     */
     const std::string_view cmakeName = t->name();
 
@@ -305,23 +311,14 @@ void target_to_cmake(const Target *t, std::ostringstream &oss)
     // we can build something with zimm and inject that into the third party target too
     const std::string location = t->assumed_path() ? t->assumed_path()->path().string() : "";
     const std::string cmakeType = std::string{cmake_type_of(t->type())};
-    const auto include_dirs_gen = [](const Target *t) -> std::generator<std::string>
-    {
-        for (const auto &prop : t->public_properties())
-        {
-            if (prop->type() != PropertyType::Include) continue;
-            auto incProp = dynamic_cast<const IncludeProperty *>(prop.get());
-            co_yield incProp->include_path().path().string();
-        }
-    };
 
-    if (dynamic_cast<const Library *>(t))
+    if (dynamic_cast<const Library *>(t) || t->type() == TargetType::ThirdPartyTarget)
         oss << std::format("add_library({} {} IMPORTED)\n", cmakeName, cmakeType);
-    else if (dynamic_cast<const Executable *>(t))
+    else if (t->type() == TargetType::Executable)
         oss << std::format("add_executable({} IMPORTED)\n", cmakeName, cmakeType);
     else
     {
-        LOGW("Why are we trying to add" << to_string(t->type()) << " to cmake?");
+        LOGW(to_string(*t) << " can not be added to cmake, skipping");
         return;
     }
 
@@ -331,10 +328,28 @@ void target_to_cmake(const Target *t, std::ostringstream &oss)
         oss << std::format("set_target_properties({} PROPERTIES IMPORTED_LOCATION {})\n", cmakeName,
                            location);
 
-    for (const auto &incDir : include_dirs_gen(t))
-        oss << std::format(
-            "set_target_properties({} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES {})\n", cmakeName,
-            incDir);
+    std::ostringstream incDirs, compileFlags, linkFlags;
+    for (const auto &prop : t->public_properties())
+    {
+        if (prop->type() == PropertyType::Include)
+            incDirs
+                << dynamic_cast<const IncludeProperty *>(prop.get())->include_path().path().string()
+                << ';';
+        else if (prop->type() == PropertyType::CompileFlag)
+            compileFlags << dynamic_cast<const CompileFlagProperty *>(prop.get())->flag() << ' ';
+        else if (prop->type() == PropertyType::LinkFlag)
+            linkFlags << dynamic_cast<const LinkFlagProperty *>(prop.get())->flag() << ' ';
+    }
+
+    oss << std::format(
+        "set_target_properties({} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES \"{}\")\n", cmakeName,
+        incDirs.str());
+
+    oss << std::format("set_target_properties({} PROPERTIES INTERFACE_COMPILE_OPTIONS \"{}\")\n",
+                       cmakeName, compileFlags.str());
+
+    oss << std::format("set_target_properties({} PROPERTIES INTERFACE_LINK_LIBRARIES \"{}\")\n",
+                       cmakeName, linkFlags.str());
 
     oss << '\n';
 }
@@ -343,7 +358,10 @@ std::string define_dependencies(std::span<const CmakeDependency> deps)
 {
     std::ostringstream oss;
     for (const CmakeDependency &dep : deps)
+    {
         for (const Target *t : dep.targets()) target_to_cmake(t, oss);
+        target_to_cmake(dep.tpt(), oss);
+    }
     return std::move(oss).str();
 }
 
@@ -398,34 +416,6 @@ std::optional<ParsedCmakeResult> run_cmake_cmd_and_parse_stdout(std::string_view
     return parse_cmake_result(stdoutPath);
 }
 
-void wire_props(const ImportedTarget &iTgt, Target *t)
-{
-    // TODO: relativeness of these paths?
-
-    for (const auto &incDir : iTgt.include_dirs)
-        t->add_public_property(IncludeProperty{Directory::make(incDir)});
-
-    // TODO: add system include property
-    for (const auto &incDir : iTgt.include_dirs)
-        t->add_public_property(CompileFlagProperty{std::format("-isystem {}", incDir)});
-
-    for (const auto &def : iTgt.defs)
-        t->add_public_property(CompileFlagProperty{std::format("-D{}", def)});
-
-    t->add_public_property(CompileFlagProperty{iTgt.compile_opts | std::views::join_with(' ') |
-                                               std::ranges::to<std::string>()});
-
-    for (const auto &linkDir : iTgt.link_dirs)
-        t->add_public_property(LinkFlagProperty{std::format("-L{}", linkDir)});
-
-    t->add_public_property(LinkFlagProperty{iTgt.link_opts | std::views::join_with(' ') |
-                                            std::ranges::to<std::string>()});
-
-    // TODO: do we need to figure out the full name (libzimmermann.so vs zimmermann)
-    for (const auto &linkLib : iTgt.link_libs_direct)
-        t->add_public_property(LinkFlagProperty{std::format("-l{}", linkLib)});
-}
-
 class Zimmify
 {
     ThirdPartyTarget &tpt;
@@ -452,7 +442,29 @@ public:
             return nullptr;
         }
 
-        wire_props(iTgt, target);
+        // TODO: relativeness of these paths?
+        for (const auto &incDir : iTgt.include_dirs)
+            target->add_public_property(IncludeProperty{Directory::make(incDir)});
+
+        // TODO: add system include property
+        for (const auto &incDir : iTgt.include_dirs)
+            target->add_public_property(CompileFlagProperty{std::format("-isystem {}", incDir)});
+
+        for (const auto &def : iTgt.defs)
+            target->add_public_property(CompileFlagProperty{std::format("-D{}", def)});
+
+        target->add_public_property(CompileFlagProperty{
+            iTgt.compile_opts | std::views::join_with(' ') | std::ranges::to<std::string>()});
+
+        for (const auto &linkDir : iTgt.link_dirs)
+            target->add_public_property(LinkFlagProperty{std::format("-L{}", linkDir)});
+
+        target->add_public_property(LinkFlagProperty{iTgt.link_opts | std::views::join_with(' ') |
+                                                     std::ranges::to<std::string>()});
+
+        // TODO: do we need to figure out the full name (libzimmermann.so vs zimmermann)
+        for (const auto &linkLib : iTgt.link_libs_direct)
+            target->add_public_property(LinkFlagProperty{std::format("-l{}", linkLib)});
         return target;
     }
 };

@@ -16,10 +16,10 @@ int main()
     ThirdPartyTargetManifest boostManifest = boostStrategy.attempt("Boost");
     ThirdPartyTarget *boostTpt = boostManifest.tpt();
 
-    // get the Library* to link by name from the populated dependents
+    // get the Library* to link by name from the populated dependencies
     auto depByName = [](const ThirdPartyTarget *tpt, std::string_view name) -> Library *
     {
-        for (Target *d : tpt->dependents())
+        for (Target *d : tpt->dependencies())
             if (d->name() == name) return dynamic_cast<Library *>(d);
         return nullptr;
     };

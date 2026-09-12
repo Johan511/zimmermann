@@ -162,13 +162,13 @@ int test_packages()
             FindCmakePackageTptStrategy strategy{searchPaths, std::string{pkg.cmakeArgs},
                                                  "relwithdebinfo"};
             auto manifest = strategy.attempt(pkg.cmakeName, cmakeDeps);
-            manifests[std::string{pkg.cmakeName}] = manifest;
 
             if (!manifest.tpt()) throw std::format("import error: empty manifest");
 
             check_found_matches_expectations(manifest, pkg);
             check_paths(manifest);
 
+            manifests[std::string{pkg.cmakeName}] = manifest;
             ++passCount;
             summary.push_back(std::format("PASS  {:<12} -", pkg.cmakeName));
         }
