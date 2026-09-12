@@ -58,7 +58,7 @@ std::string get_link_flags(std::span<const PropertyObject> props)
     for (const auto &prop : props)
     {
         if (prop->type() == PropertyType::LinkFlag)
-            oss << static_cast<const LinkFlagProperty &>(*prop).flag();
+            oss << static_cast<const LinkFlagProperty &>(*prop).flag() << ' ';
     }
     return std::move(oss).str();
 }

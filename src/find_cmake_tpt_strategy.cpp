@@ -341,15 +341,24 @@ void target_to_cmake(const Target *t, std::ostringstream &oss)
             linkFlags << dynamic_cast<const LinkFlagProperty *>(prop.get())->flag() << ' ';
     }
 
+    constexpr auto stringabunga = [](std::ostringstream oss)
+    {
+        std::string s = std::move(oss).str();
+        if (!s.empty()) s.pop_back();
+        return s;
+    };
+
     oss << std::format(
         "set_target_properties({} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES \"{}\")\n", cmakeName,
-        incDirs.str());
+        stringabunga(std::move(incDirs)));
 
     oss << std::format("set_target_properties({} PROPERTIES INTERFACE_COMPILE_OPTIONS \"{}\")\n",
-                       cmakeName, compileFlags.str());
+                       cmakeName, stringabunga(std::move(compileFlags)));
 
+    std::string linkFlagsStr = std::move(linkFlags).str();
+    if (!linkFlagsStr.empty()) linkFlagsStr.pop_back();
     oss << std::format("set_target_properties({} PROPERTIES INTERFACE_LINK_LIBRARIES \"{}\")\n",
-                       cmakeName, linkFlags.str());
+                       cmakeName, stringabunga(std::move(linkFlags)));
 
     oss << '\n';
 }
