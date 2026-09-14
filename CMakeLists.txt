@@ -17,7 +17,24 @@ add_library(zimmermann STATIC
     src/third_party_target.cpp
     src/find_cmake_tpt_strategy.cpp
 )
+
+set(ZIMM_WARNING_FLAGS -Wall -Wextra -Wpedantic -Werror)
+target_compile_options(zimmermann PRIVATE ${ZIMM_WARNING_FLAGS})
 target_compile_options(zimmermann PRIVATE "-freflection")
+
+option(ZIMM_CLANG_TIDY "Analyze zimmermann sources with clang-tidy while building" OFF)
+if(ZIMM_CLANG_TIDY)
+    message(WARNING "clang-tidy not supported yet")
+    # find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+else()
+    message(WARNING "ZIMM_CLANG_TIDY is ON but clang-tidy was not found")
+endif()
+
+if(CLANG_TIDY_EXE)
+    set_property(TARGET zimmermann PROPERTY CXX_CLANG_TIDY
+        "${CLANG_TIDY_EXE};--removed-arg=-freflection"
+    )
+endif()
 
 set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
@@ -92,3 +109,4 @@ include(CPack)
 # Auxillary targets
 add_executable(CMAKE_IMPORT_ZE_BUILD zimm_testing/cmake_import/to_docker/ze_build.cpp)
 target_link_libraries(CMAKE_IMPORT_ZE_BUILD zimmermann)
+target_compile_options(CMAKE_IMPORT_ZE_BUILD PRIVATE ${ZIMM_WARNING_FLAGS})

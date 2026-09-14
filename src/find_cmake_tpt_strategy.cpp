@@ -205,7 +205,6 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
     template for (constexpr auto member : std::define_static_array(meta::nonstatic_data_members_of(
                       ^^ParsedCmakeResult, meta::access_context::current())))
     {
-        using MemberType = typename[:meta::type_of(member):];
         if constexpr (meta::identifier_of(member) == "imported_targets")
         {
         }

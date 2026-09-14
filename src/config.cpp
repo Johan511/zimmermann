@@ -73,7 +73,7 @@ void apply_arg(Config &cfg, std::string key, std::string value)
         cfg.misc[key] = value;
 }
 
-void apply_args(Config &cfg, std::ranges::range auto keysAndValues, int depth)
+void apply_args(Config &cfg, std::ranges::range auto keysAndValues, size_t depth)
 {
     static_assert(std::is_same_v<std::ranges::range_value_t<decltype(keysAndValues)>,
                                  std::pair<std::string, std::string>>);

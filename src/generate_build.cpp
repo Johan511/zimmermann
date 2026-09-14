@@ -65,7 +65,7 @@ std::string get_deps_list(const Target &target)
     std::ostringstream oss;
     for (const auto *dep : target.dependencies())
         oss << ninja_target_name(*dep) << ' ';
-    return std::move(oss.str());
+    return std::move(oss).str();
 }
 
 std::string get_link_sources(std::span<const PolyProperty> props)
