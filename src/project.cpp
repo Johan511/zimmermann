@@ -74,21 +74,18 @@ bool Project::try_compile(std::string source, bool link)
     std::set<std::string> compile_flags;
     std::set<std::string> link_flags;
 
-    for (auto &pobj : m_globalProperties)
+    for (const auto &prop : m_globalProperties)
     {
-        const Property &prop = *pobj;
-        switch (prop.type())
+        switch (prop_type(prop))
         {
         case PropertyType::Include:
-            includes.insert(
-                static_cast<const IncludeProperty &>(prop).include_path().path().string());
+            includes.insert(std::get<IncludeProperty>(prop).include_path().path().string());
             break;
         case PropertyType::CompileFlag:
-            compile_flags.insert(
-                std::string{static_cast<const CompileFlagProperty &>(prop).flag()});
+            compile_flags.insert(std::string{std::get<CompileFlagProperty>(prop).flag()});
             break;
         case PropertyType::LinkFlag:
-            link_flags.insert(std::string{static_cast<const LinkFlagProperty &>(prop).flag()});
+            link_flags.insert(std::string{std::get<LinkFlagProperty>(prop).flag()});
             break;
         default:
             break;

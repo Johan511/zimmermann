@@ -92,15 +92,13 @@ std::generator<std::string> missing_paths(const Target *t)
 
     for (const auto &prop : std::views::concat(t->public_properties(), t->private_properties()))
     {
-        if (prop->type() == PropertyType::Include)
+        if (auto *includeProp = std::get_if<IncludeProperty>(&prop))
         {
-            auto includeProp = dynamic_cast<const IncludeProperty *>(prop.get());
             auto &includePath = includeProp->include_path().path();
             if (!fs::exists(includePath)) co_yield includePath.string();
         }
-        else if (prop->type() == PropertyType::LinkTarget)
+        else if (auto *linkProp = std::get_if<LinkTargetProperty>(&prop))
         {
-            auto linkProp = dynamic_cast<const LinkTargetProperty *>(prop.get());
             auto linkTarget = linkProp->link_lib();
             if (!linkTarget->assumed_path())
                 throw std::format("LinkTarget='{}' of AssumedTarget='{}' is not assumed",

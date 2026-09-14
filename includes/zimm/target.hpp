@@ -26,6 +26,7 @@ enum class TargetType
 };
 
 std::string to_string(const TargetType &);
+class Target;
 std::string to_string(const Target &);
 
 class ThirdPartyTarget;
@@ -88,10 +89,10 @@ class Target : public detail::AssumedTrait
     std::vector<Target *> m_dependsOn;      // Target depends on all these targets
     std::vector<Target *> m_isDependencyOf; // These targets depend on Target
 
-    std::vector<PropertyObject> m_publicProperties;
-    std::vector<PropertyObject> m_privateProperties;
+    std::vector<PolyProperty> m_publicProperties;
+    std::vector<PolyProperty> m_privateProperties;
 
-    void add_property_impl(std::vector<PropertyObject> &properties, PropertyObject property);
+    void add_property_impl(std::vector<PolyProperty> &properties, PolyProperty property);
 
 protected:
     Target(TargetType type, std::string name) noexcept : m_type(type), m_name(std::move(name)) {}
@@ -107,24 +108,24 @@ public:
     std::span<Target * const> dependencies() const noexcept { return m_dependsOn; }
     std::span<Target * const> dependents() const noexcept { return m_isDependencyOf; }
 
-    std::span<const PropertyObject> public_properties() const noexcept { return m_publicProperties; }
-    std::span<const PropertyObject> private_properties() const noexcept { return m_privateProperties; }
+    std::span<const PolyProperty> public_properties() const noexcept { return m_publicProperties; }
+    std::span<const PolyProperty> private_properties() const noexcept { return m_privateProperties; }
     // clang-format on
 
-    void add_property(const PublicTag *, PropertyObject property)
+    void add_property(const PublicTag *, PolyProperty property)
     {
         add_property_impl(m_publicProperties, property);
     }
-    void add_property(const PrivateTag *, PropertyObject property)
+    void add_property(const PrivateTag *, PolyProperty property)
     {
         add_property_impl(m_privateProperties, property);
     }
 
-    void add_public_property(PropertyObject property)
+    void add_public_property(PolyProperty property)
     {
         add_property_impl(m_publicProperties, std::move(property));
     }
-    void add_private_property(PropertyObject property)
+    void add_private_property(PolyProperty property)
     {
         add_property_impl(m_privateProperties, std::move(property));
     }

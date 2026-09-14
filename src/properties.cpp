@@ -4,25 +4,11 @@
 namespace zimm
 {
 
-Property::Property(PropertyType type) : m_type(type) {}
+IncludeProperty::IncludeProperty(Directory includePath) : m_includePath(std::move(includePath)) {}
 
-IncludeProperty::IncludeProperty(Directory includePath)
-    : Property(PropertyType::Include), m_includePath(std::move(includePath))
-{
-}
+CompileFlagProperty::CompileFlagProperty(std::string_view flag) : m_flags(std::string{flag}) {}
 
-CompileFlagProperty::CompileFlagProperty(std::string_view flag)
-    : Property(PropertyType::CompileFlag), m_flags(std::string{flag})
-{
-}
+LinkFlagProperty::LinkFlagProperty(std::string_view flag) : m_flags(std::string{flag}) {}
 
-LinkFlagProperty::LinkFlagProperty(std::string_view flag)
-    : Property(PropertyType::LinkFlag), m_flags(std::string{flag})
-{
-}
-
-LinkTargetProperty::LinkTargetProperty(const Library *target)
-    : Property(PropertyType::LinkTarget), m_linkLib(target)
-{
-}
+LinkTargetProperty::LinkTargetProperty(const Library *target) : m_linkLib(target) {}
 } // namespace zimm

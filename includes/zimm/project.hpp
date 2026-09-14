@@ -22,7 +22,7 @@ class Project
     std::string m_name;
     Config m_config;
     std::vector<Target *> m_topLevelTargets;
-    std::vector<PropertyObject> m_globalProperties;
+    std::vector<PolyProperty> m_globalProperties;
 
 public:
     Project(std::string name, Config config,
@@ -30,10 +30,7 @@ public:
 
     std::string_view name() const noexcept { return m_name; }
     const Config &config() const noexcept { return m_config; }
-    std::span<const PropertyObject> global_properties() const noexcept
-    {
-        return m_globalProperties;
-    }
+    std::span<const PolyProperty> global_properties() const noexcept { return m_globalProperties; }
     const File &main_file_path() const noexcept { return m_mainFilePath; }
     const Directory &build_dir() const noexcept { return m_buildDir; }
     const Directory &install_dir() const noexcept { return m_installDir; }
@@ -47,7 +44,7 @@ public:
         for (auto *target : targets) register_top_level_target(target);
     }
     std::span<Target *const> top_level_targets() const noexcept { return m_topLevelTargets; }
-    void add_global_property(PropertyObject property)
+    void add_global_property(PolyProperty property)
     {
         m_globalProperties.push_back(std::move(property));
     }

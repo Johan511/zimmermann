@@ -1,7 +1,9 @@
-#include "../includes/zimm/target.hpp"
-#include "../includes/zimm/logger.hpp"
+#include "zimm/target.hpp"
+#include "zimm/logger.hpp"
+#include "zimm/properties.hpp"
 
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace zimm
@@ -13,31 +15,32 @@ void add_dependency_rel(Target *target, Target *dependency)
     dependency->m_isDependencyOf.push_back(target);
 }
 
-void Target::add_property_impl(std::vector<PropertyObject> &properties, PropertyObject property)
+void Target::add_property_impl(std::vector<PolyProperty> &properties, PolyProperty property)
 {
-    static constexpr auto equals = [](const Property &a, const Property &b) -> bool
+    static constexpr auto equals = [](const PolyProperty &a, const PolyProperty &b) -> bool
     {
-        if (a.type() != b.type()) return false;
-        switch (a.type())
+        if (a.index() != b.index()) return false;
+
+        PropertyType propType = prop_type(a);
+        switch (propType)
         {
         case PropertyType::Include:
-            return static_cast<const IncludeProperty &>(a).include_path().path() ==
-                   static_cast<const IncludeProperty &>(b).include_path().path();
+            return std::get<IncludeProperty>(a).include_path().path() ==
+                   std::get<IncludeProperty>(b).include_path().path();
         case PropertyType::CompileFlag:
-            return static_cast<const CompileFlagProperty &>(a).flag() ==
-                   static_cast<const CompileFlagProperty &>(b).flag();
+            return std::get<CompileFlagProperty>(a).flag() ==
+                   std::get<CompileFlagProperty>(b).flag();
         case PropertyType::LinkFlag:
-            return static_cast<const LinkFlagProperty &>(a).flag() ==
-                   static_cast<const LinkFlagProperty &>(b).flag();
+            return std::get<LinkFlagProperty>(a).flag() == std::get<LinkFlagProperty>(b).flag();
         case PropertyType::LinkTarget:
-            return static_cast<const LinkTargetProperty &>(a).link_lib() ==
-                   static_cast<const LinkTargetProperty &>(b).link_lib();
+            return std::get<LinkTargetProperty>(a).link_lib() ==
+                   std::get<LinkTargetProperty>(b).link_lib();
         }
         return false;
     };
 
     for (auto &existing : properties)
-        if (equals(*existing, *property)) return;
+        if (equals(existing, property)) return;
 
     properties.push_back(std::move(property));
 }

@@ -331,14 +331,11 @@ void target_to_cmake(const Target *t, std::ostringstream &oss)
     std::ostringstream incDirs, compileFlags, linkFlags;
     for (const auto &prop : t->public_properties())
     {
-        if (prop->type() == PropertyType::Include)
-            incDirs
-                << dynamic_cast<const IncludeProperty *>(prop.get())->include_path().path().string()
-                << ';';
-        else if (prop->type() == PropertyType::CompileFlag)
-            compileFlags << dynamic_cast<const CompileFlagProperty *>(prop.get())->flag() << ' ';
-        else if (prop->type() == PropertyType::LinkFlag)
-            linkFlags << dynamic_cast<const LinkFlagProperty *>(prop.get())->flag() << ' ';
+        if (auto *p = std::get_if<IncludeProperty>(&prop))
+            incDirs << p->include_path().path().string() << ';';
+        else if (auto *p = std::get_if<CompileFlagProperty>(&prop))
+            compileFlags << p->flag() << ' ';
+        else if (auto *p = std::get_if<LinkFlagProperty>(&prop)) linkFlags << p->flag() << ' ';
     }
 
     constexpr auto stringabunga = [](std::ostringstream oss)

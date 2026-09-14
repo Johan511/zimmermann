@@ -1,20 +1,15 @@
 #pragma once
 
-#include "definitions.hpp"
 #include "path.hpp"
 
 #include <string>
-#include <type_traits>
+#include <variant>
 
 namespace zimm
 {
 struct PublicTag;
-struct ProtectedTag;
 struct PrivateTag;
-
-template <typename T>
-concept PPPTag = std::is_same_v<T, PublicTag> || std::is_same_v<T, ProtectedTag> ||
-                 std::is_same_v<T, PrivateTag>;
+class Library;
 
 enum class PropertyType
 {
@@ -24,76 +19,58 @@ enum class PropertyType
     LinkTarget,
 };
 
-class Property
-{
-    PropertyType m_type;
-
-protected:
-    Property(PropertyType type);
-
-public:
-    PropertyType type() const noexcept { return m_type; }
-    virtual ~Property() = default;
-    virtual std::unique_ptr<Property> clone() const = 0;
-};
-
-class IncludeProperty : public Property
+class IncludeProperty
 {
     Directory m_includePath;
 
 public:
     explicit IncludeProperty(Directory includePath);
     const Directory &include_path() const noexcept { return m_includePath; }
-    std::unique_ptr<Property> clone() const override
-    {
-        return std::make_unique<IncludeProperty>(*this);
-    }
+    PropertyType type() const noexcept { return PropertyType::Include; }
 };
 
-class CompileFlagProperty : public Property
+class CompileFlagProperty
 {
     std::string m_flags;
 
 public:
     explicit CompileFlagProperty(std::string_view flag);
     std::string_view flag() const noexcept { return m_flags; }
-    std::unique_ptr<Property> clone() const override
-    {
-        return std::make_unique<CompileFlagProperty>(*this);
-    }
+    PropertyType type() const noexcept { return PropertyType::CompileFlag; }
 };
 
-class LinkFlagProperty : public Property
+class LinkFlagProperty
 {
     std::string m_flags;
 
 public:
     explicit LinkFlagProperty(std::string_view flag);
     std::string_view flag() const noexcept { return m_flags; }
-    std::unique_ptr<Property> clone() const override
-    {
-        return std::make_unique<LinkFlagProperty>(*this);
-    }
+    PropertyType type() const noexcept { return PropertyType::LinkFlag; }
 };
 
 namespace detail
 {
 class LinkTrait;
-class SourcesTrait;
 } // namespace detail
 
-class LinkTargetProperty : public Property
+class LinkTargetProperty
 {
     friend detail::LinkTrait;
-    const class Library *m_linkLib;
+    const Library *m_linkLib;
     explicit LinkTargetProperty(const Library *target);
 
 public:
     const Library *link_lib() const noexcept { return m_linkLib; }
-    std::unique_ptr<Property> clone() const override
-    {
-        return std::make_unique<LinkTargetProperty>(*this);
-    }
+    PropertyType type() const noexcept { return PropertyType::LinkTarget; }
 };
+
+using PolyProperty =
+    std::variant<IncludeProperty, CompileFlagProperty, LinkFlagProperty, LinkTargetProperty>;
+
+inline PropertyType prop_type(const PolyProperty &p)
+{
+    return std::visit([](const auto &p) { return p.type(); }, p);
+}
 
 } // namespace zimm

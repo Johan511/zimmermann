@@ -37,29 +37,23 @@ std::string ninja_target_name(const Target &target)
     return "Unknown";
 }
 
-std::string get_compile_flags(std::span<const PropertyObject> props)
+std::string get_compile_flags(std::span<const PolyProperty> props)
 {
     std::ostringstream oss;
     for (const auto &prop : props)
     {
-        if (prop->type() == PropertyType::Include)
-            oss << "-I"
-                << static_cast<const IncludeProperty &>(*prop).include_path().path().string()
-                << " ";
-        else if (prop->type() == PropertyType::CompileFlag)
-            oss << static_cast<const CompileFlagProperty &>(*prop).flag() << " ";
+        if (auto *p = std::get_if<IncludeProperty>(&prop))
+            oss << "-I" << p->include_path().path().string() << " ";
+        else if (auto *p = std::get_if<CompileFlagProperty>(&prop)) oss << p->flag() << " ";
     }
     return std::move(oss).str();
 }
 
-std::string get_link_flags(std::span<const PropertyObject> props)
+std::string get_link_flags(std::span<const PolyProperty> props)
 {
     std::ostringstream oss;
     for (const auto &prop : props)
-    {
-        if (prop->type() == PropertyType::LinkFlag)
-            oss << static_cast<const LinkFlagProperty &>(*prop).flag() << ' ';
-    }
+        if (auto *p = std::get_if<LinkFlagProperty>(&prop)) oss << p->flag() << ' ';
     return std::move(oss).str();
 }
 
@@ -70,15 +64,15 @@ std::string get_deps_list(const Target &target)
     return std::move(oss.str());
 }
 
-std::string get_link_sources(std::span<const PropertyObject> props)
+std::string get_link_sources(std::span<const PolyProperty> props)
 {
     std::ostringstream oss;
     for (const auto &prop : props)
     {
-        if (prop->type() != PropertyType::LinkTarget) continue;
-        auto linkLib = static_cast<const LinkTargetProperty &>(*prop).link_lib();
-        if (linkLib->type() == TargetType::HeaderOnlyLibrary) continue;
-        oss << ninja_target_name(*linkLib) << " ";
+        auto linkLib = std::get_if<LinkTargetProperty>(&prop);
+        if (!linkLib) continue;
+        if (linkLib->link_lib()->type() == TargetType::HeaderOnlyLibrary) continue;
+        oss << ninja_target_name(*linkLib->link_lib()) << " ";
     }
     return std::move(oss).str();
 }
