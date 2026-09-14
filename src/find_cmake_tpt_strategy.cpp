@@ -29,7 +29,8 @@ constexpr std::string_view cmake_build_type(std::string_view buildType)
     };
 
     for (const auto &[k, v] : map)
-        if (k == buildType) return v;
+        if (k == buildType)
+            return v;
 
     LOGF("Invalid build type = " << std::quoted(buildType) << " received");
     std::unreachable();
@@ -68,7 +69,8 @@ Directory prefix_dir_of(const std::string &configPath)
         const auto d = q.filename().string();
         return d == "lib" || d == "share" || d == "cmake";
     };
-    while (isKnown(p) && p.has_parent_path()) p = p.parent_path();
+    while (isKnown(p) && p.has_parent_path())
+        p = p.parent_path();
 
     if (p.empty())
     {
@@ -95,9 +97,12 @@ std::string resolve_against_config(std::string_view dir, std::string_view config
 
 std::string normalize_lib_entry(std::string_view entry)
 {
-    if (entry.empty()) return {};
-    if (entry.starts_with("-l")) return std::string{entry};
-    if (entry.find('/') != std::string_view::npos) return std::string{entry}; // path-ish
+    if (entry.empty())
+        return {};
+    if (entry.starts_with("-l"))
+        return std::string{entry};
+    if (entry.find('/') != std::string_view::npos)
+        return std::string{entry}; // path-ish
     LOGI("FindCmakePackageTptStrategy: bare library name '" << entry << "' normalized to '-l"
                                                             << entry << "'");
     return std::format("-l{}", entry);
@@ -138,9 +143,12 @@ std::optional<ParsedCmakeResult> normalize(ParsedCmakeResult cmakeResult)
         {
             const std::string ext = fs::path{iTgt.location}.extension().string();
 
-            if (iTgt.location.empty()) iTgt.type = "INTERFACE_LIBRARY";
-            else if (ext == ".a" || ext == ".lib") iTgt.type = "STATIC_LIBRARY";
-            else if (ext == ".so" || ext == ".dll") iTgt.type = "SHARED_LIBRARY";
+            if (iTgt.location.empty())
+                iTgt.type = "INTERFACE_LIBRARY";
+            else if (ext == ".a" || ext == ".lib")
+                iTgt.type = "STATIC_LIBRARY";
+            else if (ext == ".so" || ext == ".dll")
+                iTgt.type = "SHARED_LIBRARY";
         }
     }
 
@@ -169,7 +177,8 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
             return std::nullopt;
         }
         auto eqPosn = line.find('=');
-        if (eqPosn == std::string::npos) return std::nullopt;
+        if (eqPosn == std::string::npos)
+            return std::nullopt;
         std::string_view key{line.data(), eqPosn};
         if (key != expectedKey)
         {
@@ -184,11 +193,13 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
     static constexpr auto parse_member = [](auto &member, std::string value)
     {
         using MemberType = std::remove_reference_t<decltype(member)>;
-        if constexpr (std::same_as<MemberType, std::string>) member = std::move(value);
+        if constexpr (std::same_as<MemberType, std::string>)
+            member = std::move(value);
         else if constexpr (std::same_as<MemberType, std::vector<std::string>>)
             member = std::move(value) | std::views::split(';') |
                      std::ranges::to<std::vector<std::string>>();
-        else static_assert(false, "only std::string and std::vector<std::string> are supported");
+        else
+            static_assert(false, "only std::string and std::vector<std::string> are supported");
     };
 
     template for (constexpr auto member : std::define_static_array(meta::nonstatic_data_members_of(
@@ -201,7 +212,8 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
         else
         {
             auto value = parse_next(meta::identifier_of(member));
-            if (!value) return std::nullopt;
+            if (!value)
+                return std::nullopt;
 
             parse_member(result.[:member:], std::move(*value));
         }
@@ -335,13 +347,15 @@ void target_to_cmake(const Target *t, std::ostringstream &oss)
             incDirs << p->include_path().path().string() << ';';
         else if (auto *p = std::get_if<CompileFlagProperty>(&prop))
             compileFlags << p->flag() << ' ';
-        else if (auto *p = std::get_if<LinkFlagProperty>(&prop)) linkFlags << p->flag() << ' ';
+        else if (auto *p = std::get_if<LinkFlagProperty>(&prop))
+            linkFlags << p->flag() << ' ';
     }
 
     constexpr auto stringabunga = [](std::ostringstream oss)
     {
         std::string s = std::move(oss).str();
-        if (!s.empty()) s.pop_back();
+        if (!s.empty())
+            s.pop_back();
         return s;
     };
 
@@ -353,7 +367,8 @@ void target_to_cmake(const Target *t, std::ostringstream &oss)
                        cmakeName, stringabunga(std::move(compileFlags)));
 
     std::string linkFlagsStr = std::move(linkFlags).str();
-    if (!linkFlagsStr.empty()) linkFlagsStr.pop_back();
+    if (!linkFlagsStr.empty())
+        linkFlagsStr.pop_back();
     oss << std::format("set_target_properties({} PROPERTIES INTERFACE_LINK_LIBRARIES \"{}\")\n",
                        cmakeName, stringabunga(std::move(linkFlags)));
 
@@ -365,7 +380,8 @@ std::string define_dependencies(std::span<const CmakeDependency> deps)
     std::ostringstream oss;
     for (const CmakeDependency &dep : deps)
     {
-        for (const Target *t : dep.targets()) target_to_cmake(t, oss);
+        for (const Target *t : dep.targets())
+            target_to_cmake(t, oss);
         target_to_cmake(dep.tpt(), oss);
     }
     return std::move(oss).str();
@@ -515,7 +531,8 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
         cmake_cmd(scratch, m_buildType, m_searchDirs),
         scratch.file(std::format("vars_{}.txt", cmake_build_type(m_buildType))));
 
-    if (!cmakeResultOpt || cmakeResultOpt->config.empty()) return {};
+    if (!cmakeResultOpt || cmakeResultOpt->config.empty())
+        return {};
     ParsedCmakeResult &cmakeResult = *cmakeResultOpt;
 
     Directory prefixDir = prefix_dir(cmakeResult);
@@ -536,7 +553,8 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
                        std::views::filter(std::identity{}) /* filter out nullptr */ |
                        std::ranges::to<std::vector>();
 
-    for (Target *t : zimmTargets) add_dependency_rel(tpt, t);
+    for (Target *t : zimmTargets)
+        add_dependency_rel(tpt, t);
 
     return {tpt, std::move(zimmTargets)};
 }

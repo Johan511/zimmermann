@@ -19,7 +19,8 @@ void Target::add_property_impl(std::vector<PolyProperty> &properties, PolyProper
 {
     static constexpr auto equals = [](const PolyProperty &a, const PolyProperty &b) -> bool
     {
-        if (a.index() != b.index()) return false;
+        if (a.index() != b.index())
+            return false;
 
         PropertyType propType = prop_type(a);
         switch (propType)
@@ -40,7 +41,8 @@ void Target::add_property_impl(std::vector<PolyProperty> &properties, PolyProper
     };
 
     for (auto &existing : properties)
-        if (equals(existing, property)) return;
+        if (equals(existing, property))
+            return;
 
     properties.push_back(std::move(property));
 }
@@ -86,12 +88,14 @@ void detail::LinkTrait::link_with(const PrivateTag *, Library *linkLib)
 
 void detail::LinkTrait::link_with(const PublicTag *, std::initializer_list<Library *> linkLibs)
 {
-    for (auto *linkLib : linkLibs) link_with(public_, linkLib);
+    for (auto *linkLib : linkLibs)
+        link_with(public_, linkLib);
 }
 
 void detail::LinkTrait::link_with(const PrivateTag *, std::initializer_list<Library *> linkLibs)
 {
-    for (auto *linkLib : linkLibs) link_with(private_, linkLib);
+    for (auto *linkLib : linkLibs)
+        link_with(private_, linkLib);
 }
 
 } // namespace zimm

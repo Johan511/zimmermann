@@ -31,7 +31,8 @@ inline std::generator<std::pair<std::string, std::string>> parse_xml_args(std::s
 
     for (pugi::xml_node node = doc.first_child().first_child(); node; node = node.next_sibling())
     {
-        if (node.type() != pugi::node_element) continue;
+        if (node.type() != pugi::node_element)
+            continue;
         co_yield {node.name(), node.child_value()};
     }
 }

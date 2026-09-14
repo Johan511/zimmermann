@@ -3,9 +3,7 @@ ColumnLimit: 100
 IndentWidth: 4
 BreakTemplateDeclarations: Yes
 RequiresClausePosition: WithPreceding
-AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AllowShortLambdasOnASingleLine: All
-AllowShortLoopsOnASingleLine: TRUE
 BreakBeforeBraces: Allman
 BraceWrapping:
   SplitEmptyRecord: false

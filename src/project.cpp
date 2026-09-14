@@ -45,7 +45,8 @@ std::unordered_set<Target *> Project::seach_all_targets() const
     {
         // check that top level targets unique
         for (Target *t : m_topLevelTargets)
-            if (!seen.emplace(t).second) LOGF("Duplicate top level target");
+            if (!seen.emplace(t).second)
+                LOGF("Duplicate top level target");
         seen.clear();
     }
 
@@ -57,11 +58,13 @@ std::unordered_set<Target *> Project::seach_all_targets() const
         Target *top = stk.top();
         stk.pop();
 
-        if (seen.contains(top)) continue;
+        if (seen.contains(top))
+            continue;
         seen.insert(top);
 
         for (auto dep : top->dependencies())
-            if (!seen.contains(dep)) stk.push(dep);
+            if (!seen.contains(dep))
+                stk.push(dep);
     }
 
     return seen;
@@ -93,8 +96,10 @@ bool Project::try_compile(std::string source, bool link)
     }
 
     std::string cxxflags = m_config.cxx_flags;
-    for (auto &inc : includes) cxxflags += " -I" + inc;
-    for (auto &f : compile_flags) cxxflags += " " + f;
+    for (auto &inc : includes)
+        cxxflags += " -I" + inc;
+    for (auto &f : compile_flags)
+        cxxflags += " " + f;
 
     // --- write source file ---
 
@@ -102,7 +107,8 @@ bool Project::try_compile(std::string source, bool link)
     auto src_file = m_featureDetectionDir.file(std::format("{}.cpp", name));
     {
         std::ofstream src_ofs(src_file.path());
-        if (!src_ofs) return false;
+        if (!src_ofs)
+            return false;
         src_ofs << source;
     }
 
@@ -119,19 +125,22 @@ bool Project::try_compile(std::string source, bool link)
     auto compile_cmd = std::format("{} {} -c {} -o {} 2>{}", compiler, cxxflags,
                                    src_file.path().string(), objStr, errStr);
 
-    if (std::system(compile_cmd.c_str()) != 0) return false;
+    if (std::system(compile_cmd.c_str()) != 0)
+        return false;
 
     if (link)
     {
         std::string ldflags;
-        for (auto &f : link_flags) ldflags += " " + f;
+        for (auto &f : link_flags)
+            ldflags += " " + f;
 
         auto bin_file = m_featureDetectionDir.file(name);
         const auto binStr = bin_file.path().string();
         auto link_cmd =
             std::format("{} {} {} -o {} 2>>{}", compiler, objStr, ldflags, binStr, errStr);
 
-        if (std::system(link_cmd.c_str()) != 0) return false;
+        if (std::system(link_cmd.c_str()) != 0)
+            return false;
     }
 
     return true;
@@ -139,7 +148,8 @@ bool Project::try_compile(std::string source, bool link)
 
 std::optional<std::string> Project::try_run(std::string source)
 {
-    if (!try_compile(std::move(source), /*link=*/true)) return std::nullopt;
+    if (!try_compile(std::move(source), /*link=*/true))
+        return std::nullopt;
 
     constexpr auto name = "zimm_check";
 
@@ -152,10 +162,12 @@ std::optional<std::string> Project::try_run(std::string source)
 
     auto run_cmd = std::format("{} > {} 2>>{}", binStr, out_file.path().string(), errStr);
 
-    if (std::system(run_cmd.c_str()) != 0) return std::nullopt;
+    if (std::system(run_cmd.c_str()) != 0)
+        return std::nullopt;
 
     std::ifstream out_ofs(out_file.path());
-    if (!out_ofs) return std::nullopt;
+    if (!out_ofs)
+        return std::nullopt;
 
     std::string result(std::istreambuf_iterator<char>{out_ofs}, std::istreambuf_iterator<char>{});
     return result;
@@ -186,7 +198,8 @@ bool Project::check_function_exists(std::string function_name)
 bool Project::check_symbol_exists(std::string symbol, std::vector<std::string> headers)
 {
     std::string header_block;
-    for (const auto &h : headers) header_block += std::format("#include <{}>\n", h);
+    for (const auto &h : headers)
+        header_block += std::format("#include <{}>\n", h);
 
     auto src = std::format("{}"
                            "int main() {{\n"
@@ -200,7 +213,8 @@ bool Project::check_symbol_exists(std::string symbol, std::vector<std::string> h
 std::optional<size_t> Project::check_type_size(std::string type, std::vector<std::string> headers)
 {
     std::string header_block;
-    for (const auto &h : headers) header_block += std::format("#include <{}>\n", h);
+    for (const auto &h : headers)
+        header_block += std::format("#include <{}>\n", h);
 
     auto src = std::format("{}"
                            "#include <cstdio>\n"
@@ -211,7 +225,8 @@ std::optional<size_t> Project::check_type_size(std::string type, std::vector<std
                            header_block, type);
 
     auto output = try_run(std::move(src));
-    if (!output) return std::nullopt;
+    if (!output)
+        return std::nullopt;
 
     return std::stoull(*output);
 }

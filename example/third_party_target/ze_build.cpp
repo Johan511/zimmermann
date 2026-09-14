@@ -20,7 +20,8 @@ int main()
     auto depByName = [](const ThirdPartyTarget *tpt, std::string_view name) -> Library *
     {
         for (Target *d : tpt->dependencies())
-            if (d->name() == name) return dynamic_cast<Library *>(d);
+            if (d->name() == name)
+                return dynamic_cast<Library *>(d);
         return nullptr;
     };
     // Boost::program_options — its Boost::headers dep's include dirs ride along transitively

@@ -30,7 +30,8 @@ public:
         std::ostringstream oss;
         ((oss << args << ' '), ...);
         std::string conflatedArgs = std::move(oss).str();
-        if constexpr (sizeof...(args)) conflatedArgs.pop_back(); // remove the last space
+        if constexpr (sizeof...(args))
+            conflatedArgs.pop_back(); // remove the last space
         m_tests.emplace_back(exec, std::move(conflatedArgs));
     }
 

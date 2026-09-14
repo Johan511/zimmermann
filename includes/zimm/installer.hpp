@@ -33,17 +33,20 @@ public:
 
     void install_binary(std::initializer_list<Executable *> exes)
     {
-        for (auto *e : exes) install_binary(e);
+        for (auto *e : exes)
+            install_binary(e);
     }
 
     void install_lib(std::initializer_list<SharedLibrary *> libs)
     {
-        for (auto *lib : libs) install_lib(lib);
+        for (auto *lib : libs)
+            install_lib(lib);
     }
 
     void install_lib(std::initializer_list<StaticLibrary *> libs)
     {
-        for (auto *lib : libs) install_lib(lib);
+        for (auto *lib : libs)
+            install_lib(lib);
     }
 
     const auto &files() const noexcept { return m_installFiles; }

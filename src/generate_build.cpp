@@ -17,7 +17,8 @@ namespace
 std::string ninja_target_name(const Target &target)
 {
     const auto &assumedPath = target.assumed_path();
-    if (assumedPath) return assumedPath->path().string();
+    if (assumedPath)
+        return assumedPath->path().string();
 
     switch (target.type())
     {
@@ -44,7 +45,8 @@ std::string get_compile_flags(std::span<const PolyProperty> props)
     {
         if (auto *p = std::get_if<IncludeProperty>(&prop))
             oss << "-I" << p->include_path().path().string() << " ";
-        else if (auto *p = std::get_if<CompileFlagProperty>(&prop)) oss << p->flag() << " ";
+        else if (auto *p = std::get_if<CompileFlagProperty>(&prop))
+            oss << p->flag() << " ";
     }
     return std::move(oss).str();
 }
@@ -53,14 +55,16 @@ std::string get_link_flags(std::span<const PolyProperty> props)
 {
     std::ostringstream oss;
     for (const auto &prop : props)
-        if (auto *p = std::get_if<LinkFlagProperty>(&prop)) oss << p->flag() << ' ';
+        if (auto *p = std::get_if<LinkFlagProperty>(&prop))
+            oss << p->flag() << ' ';
     return std::move(oss).str();
 }
 
 std::string get_deps_list(const Target &target)
 {
     std::ostringstream oss;
-    for (const auto *dep : target.dependencies()) oss << ninja_target_name(*dep) << ' ';
+    for (const auto *dep : target.dependencies())
+        oss << ninja_target_name(*dep) << ' ';
     return std::move(oss.str());
 }
 
@@ -70,8 +74,10 @@ std::string get_link_sources(std::span<const PolyProperty> props)
     for (const auto &prop : props)
     {
         auto linkLib = std::get_if<LinkTargetProperty>(&prop);
-        if (!linkLib) continue;
-        if (linkLib->link_lib()->type() == TargetType::HeaderOnlyLibrary) continue;
+        if (!linkLib)
+            continue;
+        if (linkLib->link_lib()->type() == TargetType::HeaderOnlyLibrary)
+            continue;
         oss << ninja_target_name(*linkLib->link_lib()) << " ";
     }
     return std::move(oss).str();
@@ -82,7 +88,8 @@ std::string ninja_target_name(const File &file /* cxx or c file */)
     std::string objectFilePath = file.path().string();
     objectFilePath += ".o";
     for (auto &c : objectFilePath)
-        if (c == '/') c = '_';
+        if (c == '/')
+            c = '_';
     return objectFilePath;
 }
 
@@ -94,7 +101,8 @@ std::string test_name(const detail::Test &test)
 
     std::string testName = std::move(oss).str();
     for (auto &c : testName)
-        if (!std::isalpha(static_cast<unsigned char>(c))) c = '_';
+        if (!std::isalpha(static_cast<unsigned char>(c)))
+            c = '_';
     return testName;
 }
 
@@ -106,7 +114,8 @@ std::vector<Target *> top_sort_all_targets(std::ranges::range auto &&allTargets)
     for (Target *t : allTargets)
     {
         auto numDeps = t->dependencies().size();
-        if (numDeps == 0) visitQueue.push(t);
+        if (numDeps == 0)
+            visitQueue.push(t);
         inDegreeMap[t] = numDeps;
     }
 
@@ -118,10 +127,12 @@ std::vector<Target *> top_sort_all_targets(std::ranges::range auto &&allTargets)
 
         topologicalOrder.push_back(front);
         for (Target *dependent : front->dependents())
-            if (--inDegreeMap[dependent] == 0) visitQueue.push(dependent);
+            if (--inDegreeMap[dependent] == 0)
+                visitQueue.push(dependent);
     }
 
-    if (topologicalOrder.size() != allTargets.size()) LOGF("fold failed because graph has cycles");
+    if (topologicalOrder.size() != allTargets.size())
+        LOGF("fold failed because graph has cycles");
     return topologicalOrder;
 }
 } // namespace
@@ -134,20 +145,24 @@ void generate_build(Project &project)
     {
         Target &t = *tRef;
         for (auto dep : t.dependencies())
-            for (auto &p : dep->public_properties()) t.add_property(public_, p);
+            for (auto &p : dep->public_properties())
+                t.add_property(public_, p);
     }
 
     for (auto t : topSortedTargets)
     {
-        if (t->type() != TargetType::ThirdPartyTarget) continue;
+        if (t->type() != TargetType::ThirdPartyTarget)
+            continue;
         auto &tpt = static_cast<const ThirdPartyTarget &>(*t);
         auto metaCmd = tpt.meta_build_cmd();
-        if (metaCmd.empty()) continue;
+        if (metaCmd.empty())
+            continue;
 
         std::string metaStamp =
             project.build_dir().file(std::format("{}.meta.stamp", t->name())).path().string();
         std::cout << metaStamp << '\n';
-        if (fs::exists(metaStamp)) continue;
+        if (fs::exists(metaStamp))
+            continue;
 
         fs::create_directories(tpt.dir().path());
         std::string cmd =
@@ -159,7 +174,8 @@ void generate_build(Project &project)
     }
 
     std::ofstream out(project.build_dir().file("build.ninja").path().string());
-    if (!out) LOGF("Error: could not open build.ninja for writing");
+    if (!out)
+        LOGF("Error: could not open build.ninja for writing");
 
     out << "# Generated by zimm — do not edit by hand\n";
     out << "ninja_required_version = 1.10\n\n";
@@ -223,7 +239,8 @@ void generate_build(Project &project)
         if (assumedPath)
         {
             out << "build " << assumedPath->path().string() << ": assumed_target";
-            if (!depList.empty()) out << " | " << depList;
+            if (!depList.empty())
+                out << " | " << depList;
             out << "\n\n";
             continue;
         }
@@ -272,7 +289,8 @@ void generate_build(Project &project)
             auto &lib = static_cast<const StaticLibrary &>(target);
             out << "build " << ninja_target_name(lib) << ": ar " << sourceObjectsNinjaNames << " "
                 << linkSourcesNinjaNames;
-            if (!depsEnsured) out << " | " << depList;
+            if (!depsEnsured)
+                out << " | " << depList;
             out << "\n\n";
             break;
         }
@@ -280,7 +298,8 @@ void generate_build(Project &project)
         {
             auto &lib = static_cast<const SharedLibrary &>(target);
             out << "build " << ninja_target_name(lib) << ": link " << sourceObjectsNinjaNames;
-            if (!depsEnsured) out << " | " << depList;
+            if (!depsEnsured)
+                out << " | " << depList;
             out << '\n';
             out << "  ldflags = -shared " << globalLinkFlags << " " << localLinkFlags << "\n";
             out << "  libs = -Wl,--whole-archive " << linkSourcesNinjaNames
@@ -292,7 +311,8 @@ void generate_build(Project &project)
             auto &exec = static_cast<const Executable &>(target);
             out << "build " << ninja_target_name(exec) << ": link " << sourceObjectsNinjaNames
                 << " " << linkSourcesNinjaNames;
-            if (!depsEnsured) out << " | " << depList;
+            if (!depsEnsured)
+                out << " | " << depList;
             out << '\n';
             out << "  ldflags = " << globalLinkFlags << " " << localLinkFlags << "\n\n";
             break;
@@ -300,7 +320,8 @@ void generate_build(Project &project)
         case TargetType::HeaderOnlyLibrary:
         {
             out << "build " << ninja_target_name(target) << ": phony";
-            if (!depList.empty()) out << " | " << depList;
+            if (!depList.empty())
+                out << " | " << depList;
             out << "\n\n";
             break;
         }
@@ -308,10 +329,12 @@ void generate_build(Project &project)
         {
             auto &tpt = static_cast<const ThirdPartyTarget &>(target);
             auto build = tpt.build_cmd();
-            if (build.empty()) build = "true";
+            if (build.empty())
+                build = "true";
 
             // Third Party Target is not expected to have sources
-            if (depsEnsured) LOGF("Why does Third Party Target have sources?");
+            if (depsEnsured)
+                LOGF("Why does Third Party Target have sources?");
             out << "build " << ninja_target_name(tpt) << ": run_cmd | " << depList << "\n";
 
             // Directory already created before executing meta command
@@ -327,14 +350,17 @@ void generate_build(Project &project)
             fs::create_directories(ct.dir().path());
 
             out << "build";
-            for (auto &o : ct.outputs()) out << " " << o;
+            for (auto &o : ct.outputs())
+                out << " " << o;
             out << " " << ninja_target_name(target);
             out << ": run_cmd";
-            for (auto &i : ct.inputs()) out << " " << i;
+            for (auto &i : ct.inputs())
+                out << " " << i;
             out << " | " << depList << "\n";
 
             // Third Party Target is not expected to have sources
-            if (depsEnsured) LOGF("Why does CustomTarget have sources?");
+            if (depsEnsured)
+                LOGF("Why does CustomTarget have sources?");
 
             auto genCmd = ct.generate_cmd();
             out << "  dir = " << ct.dir().path().string() << "\n";
@@ -349,7 +375,8 @@ void generate_build(Project &project)
     // Default targets — what `ninja` (without arguments) builds.
     // Tests are intentionally excluded: they only run via `ninja test`.
     out << "default";
-    for (auto *t : project.top_level_targets()) out << " " << ninja_target_name(*t);
+    for (auto *t : project.top_level_targets())
+        out << " " << ninja_target_name(*t);
     out << "\n\n";
 
     const auto &install_files = project.installer().files();
@@ -378,7 +405,8 @@ void generate_build(Project &project)
     };
 
     for (auto &[rel_dest, files] : install_files)
-        for (const auto &src : files) emitInstallFile(rel_dest, src.path());
+        for (const auto &src : files)
+            emitInstallFile(rel_dest, src.path());
 
     // target installs → their build-dir artifact
     for (const Target *t : install_targets)
@@ -403,7 +431,8 @@ void generate_build(Project &project)
 
     // Emit the `install` phony target pointing at everything above.
     out << "build install: phony";
-    for (auto &t : phony_targets) out << " " << t;
+    for (auto &t : phony_targets)
+        out << " " << t;
     out << "\n\n";
 
     // TODO: ninja test <args> -> calls executable with args
@@ -431,12 +460,14 @@ void generate_build(Project &project)
     for (const auto &[execName, tests] : testMap)
     {
         out << "build test-" << execName << ": phony";
-        for (const auto *test : tests) out << " " << test_name(*test) << ".test.stamp";
+        for (const auto *test : tests)
+            out << " " << test_name(*test) << ".test.stamp";
         out << "\n\n";
     }
 
     out << "build test: phony";
-    for (const auto &[execName, _] : testMap) out << " test-" << execName;
+    for (const auto &[execName, _] : testMap)
+        out << " test-" << execName;
     out << "\n\n";
 
     out.close();

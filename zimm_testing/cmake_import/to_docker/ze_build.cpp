@@ -67,11 +67,13 @@ void check_found_matches_expectations(const ThirdPartyTargetManifest &manifest, 
 
     std::vector<TargetInfo> missing;
     for (const auto &e : expected)
-        if (std::ranges::find(found, e) == found.end()) missing.push_back(e);
+        if (std::ranges::find(found, e) == found.end())
+            missing.push_back(e);
 
     std::vector<TargetInfo> extra;
     for (const auto &f : found)
-        if (std::ranges::find(expected, f) == expected.end()) extra.push_back(f);
+        if (std::ranges::find(expected, f) == expected.end())
+            extra.push_back(f);
 
     if (!missing.empty() || !extra.empty())
     {
@@ -87,7 +89,8 @@ std::generator<std::string> missing_paths(const Target *t)
     if (t->assumed_path())
     {
         auto &assumedPath = t->assumed_path()->path();
-        if (!fs::exists(assumedPath)) co_yield assumedPath.string();
+        if (!fs::exists(assumedPath))
+            co_yield assumedPath.string();
     }
 
     for (const auto &prop : std::views::concat(t->public_properties(), t->private_properties()))
@@ -95,7 +98,8 @@ std::generator<std::string> missing_paths(const Target *t)
         if (auto *includeProp = std::get_if<IncludeProperty>(&prop))
         {
             auto &includePath = includeProp->include_path().path();
-            if (!fs::exists(includePath)) co_yield includePath.string();
+            if (!fs::exists(includePath))
+                co_yield includePath.string();
         }
         else if (auto *linkProp = std::get_if<LinkTargetProperty>(&prop))
         {
@@ -104,7 +108,8 @@ std::generator<std::string> missing_paths(const Target *t)
                 throw std::format("LinkTarget='{}' of AssumedTarget='{}' is not assumed",
                                   to_string(*linkTarget), to_string(*t));
             auto &linkPath = linkTarget->assumed_path()->path();
-            if (!fs::exists(linkPath)) co_yield linkPath.string();
+            if (!fs::exists(linkPath))
+                co_yield linkPath.string();
         }
     }
 }
@@ -114,7 +119,8 @@ void check_paths(const ThirdPartyTargetManifest &manifest)
     std::vector<std::string> badPaths;
 
     badPaths.append_range(missing_paths(manifest.tpt()));
-    for (const Target *t : manifest.targets()) badPaths.append_range(missing_paths(t));
+    for (const Target *t : manifest.targets())
+        badPaths.append_range(missing_paths(t));
 
     if (!badPaths.empty())
     {
@@ -138,7 +144,8 @@ int test_packages()
     for (const Package &pkg : packages)
     {
         std::cout << "== find_package(" << pkg.cmakeName << " CONFIG REQUIRED";
-        if (!pkg.cmakeArgs.empty()) std::cout << " " << pkg.cmakeArgs;
+        if (!pkg.cmakeArgs.empty())
+            std::cout << " " << pkg.cmakeArgs;
         std::cout << ")\n";
 
         try
@@ -161,7 +168,8 @@ int test_packages()
                                                  "relwithdebinfo"};
             auto manifest = strategy.attempt(pkg.cmakeName, cmakeDeps);
 
-            if (!manifest.tpt()) throw std::format("import error: empty manifest");
+            if (!manifest.tpt())
+                throw std::format("import error: empty manifest");
 
             check_found_matches_expectations(manifest, pkg);
             check_paths(manifest);
@@ -178,7 +186,8 @@ int test_packages()
     }
 
     std::cout << "\n==== summary ====" << std::endl;
-    for (const std::string &line : summary) std::cout << line << std::endl;
+    for (const std::string &line : summary)
+        std::cout << line << std::endl;
     std::cout << std::format("\n{} pass, {} fail", passCount, failCount) << std::endl;
     return failCount == 0 ? 0 : 1;
 }

@@ -15,7 +15,8 @@ FindPackageTptStrategy::FindPackageTptStrategy(std::vector<Directory> searchPath
                                                MatchingDirPred matchingDir)
     : m_matchingDir(std::move(matchingDir))
 {
-    for (auto &searchPath : searchPaths) m_searchDirs.push_back(std::move(searchPath));
+    for (auto &searchPath : searchPaths)
+        m_searchDirs.push_back(std::move(searchPath));
 }
 
 FindPackageTptStrategy::FindPackageTptStrategy(MatchingDirPred matchingDir)
@@ -30,7 +31,8 @@ ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
     for (const Directory &searchDir : m_searchDirs)
     {
         const fs::path &path = searchDir.path();
-        if (!fs::is_directory(path)) continue;
+        if (!fs::is_directory(path))
+            continue;
 
         if (m_matchingDir(searchDir.dir_name(), name))
             return ThirdPartyTarget::make(std::string{name}, searchDir);
@@ -40,7 +42,8 @@ ThirdPartyTarget *FindPackageTptStrategy::attempt(std::string_view name) const
         // TODO: do we need to try-catch the iteration increment?
         for (const auto &child : fs::directory_iterator(path, skip_permission_denied))
         {
-            if (!child.is_directory()) continue;
+            if (!child.is_directory())
+                continue;
             const fs::path &childPath = child.path();
             if (m_matchingDir(childPath.filename().c_str(), name))
 
@@ -138,7 +141,8 @@ std::vector<T *> filter(auto &targets, std::optional<TargetType> type, std::stri
            std::views::filter(
                [&](const Target *t)
                {
-                   if (type && t->type() != *type) return false;
+                   if (type && t->type() != *type)
+                       return false;
                    return name.empty() || t->name() == name;
                }) |
            std::views::transform([](Target *t) { return static_cast<T *>(t); }) |

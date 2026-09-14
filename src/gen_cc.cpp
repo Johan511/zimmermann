@@ -40,7 +40,8 @@ static std::string json_escape(std::string_view s)
         default:
             if (static_cast<unsigned char>(c) < 0x20)
                 out += std::format("\\u{:04X}", static_cast<unsigned char>(c));
-            else out += c;
+            else
+                out += c;
             break;
         }
     }
@@ -54,7 +55,8 @@ void GenCc::add_entry(Directory directory, File file, std::string command)
 
 void GenCc::write(std::ofstream &out)
 {
-    if (!out) LOGF("Error: could not open compile_commands.json for writing");
+    if (!out)
+        LOGF("Error: could not open compile_commands.json for writing");
 
     out << "[\n";
     for (size_t i = 0; i < m_entries.size(); ++i)
@@ -65,7 +67,8 @@ void GenCc::write(std::ofstream &out)
         out << "    \"file\": \"" << json_escape(e.file.path().string()) << "\",\n";
         out << "    \"command\": \"" << json_escape(e.command) << "\"\n";
         out << "  }";
-        if (i + 1 < m_entries.size()) out << ",";
+        if (i + 1 < m_entries.size())
+            out << ",";
         out << "\n";
     }
     out << "]\n";

@@ -40,7 +40,8 @@ consteval bool is_append_field(meta::info info)
 {
     static constexpr auto appendFieldsList = {^^Config::c_flags, ^^Config::cxx_flags};
     for (const auto field : appendFieldsList)
-        if (info == field) return true;
+        if (info == field)
+            return true;
     return false;
 }
 
@@ -51,7 +52,8 @@ void apply_arg(Config &cfg, std::string key, std::string value)
                       meta::nonstatic_data_members_of(^^Config, meta::access_context::current())))
     {
         constexpr auto memberName = meta::identifier_of(member);
-        if (memberName != key) continue;
+        if (memberName != key)
+            continue;
 
         if constexpr (is_append_field(member))
         {
@@ -63,10 +65,12 @@ void apply_arg(Config &cfg, std::string key, std::string value)
             cfg.[:member:] = typename[:meta::type_of(member):]{std::move(value)};
             matched = true;
         }
-        else LOGE("Invalid key: misc is being ignored");
+        else
+            LOGE("Invalid key: misc is being ignored");
     }
 
-    if (!matched) cfg.misc[key] = value;
+    if (!matched)
+        cfg.misc[key] = value;
 }
 
 void apply_args(Config &cfg, std::ranges::range auto keysAndValues, int depth)
@@ -78,10 +82,12 @@ void apply_args(Config &cfg, std::ranges::range auto keysAndValues, int depth)
 
     for (auto &&[key, value] : std::move(keysAndValues))
     {
-        if (key == "args_xml") apply_args(cfg, parse_xml_args(value), depth + 1);
+        if (key == "args_xml")
+            apply_args(cfg, parse_xml_args(value), depth + 1);
         else if (key == "args_yaml" || key == "args_yml")
             apply_args(cfg, parse_yaml_args(value), depth + 1);
-        else apply_arg(cfg, std::move(key), std::move(value));
+        else
+            apply_arg(cfg, std::move(key), std::move(value));
     }
 }
 

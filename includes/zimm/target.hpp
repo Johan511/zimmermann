@@ -55,7 +55,8 @@ public:
     }
     void add_sources(std::initializer_list<File> sources)
     {
-        for (const auto &source : sources) add_source(source);
+        for (const auto &source : sources)
+            add_source(source);
     }
     std::span<const File> sources() const noexcept { return m_sources; }
     virtual ~SourcesTrait() = default;
@@ -200,12 +201,14 @@ public:
     void add_input(std::string input) { m_inputs.push_back(std::move(input)); }
     void add_inputs(std::initializer_list<std::string> inputs)
     {
-        for (const auto &input : inputs) add_input(input);
+        for (const auto &input : inputs)
+            add_input(input);
     }
     void add_output(std::string output) { m_outputs.push_back(std::move(output)); }
     void add_outputs(std::initializer_list<std::string> outputs)
     {
-        for (const auto &output : outputs) add_output(output);
+        for (const auto &output : outputs)
+            add_output(output);
     }
 
     std::string generate_cmd() const override { return CustomTargetTag::cmd(m_inputs, m_outputs); }

@@ -19,7 +19,8 @@ void Socket::disconnect()
 
 void Socket::send(std::string_view data) const
 {
-    if (m_connected) std::println("Sent {} bytes to {}:{}", data.size(), m_addr.host, m_addr.port);
+    if (m_connected)
+        std::println("Sent {} bytes to {}:{}", data.size(), m_addr.host, m_addr.port);
 }
 
 } // namespace network
