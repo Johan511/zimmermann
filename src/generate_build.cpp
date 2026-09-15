@@ -245,7 +245,7 @@ void generate_build(Project &project)
             continue;
         }
 
-        auto ninjaName = ninja_target_name(target);
+        auto ninjaTargetName = ninja_target_name(target);
         std::string localCompileFlags = get_compile_flags(target.public_properties()) + " " +
                                         get_compile_flags(target.private_properties());
 
@@ -319,7 +319,7 @@ void generate_build(Project &project)
         }
         case TargetType::HeaderOnlyLibrary:
         {
-            out << "build " << ninja_target_name(target) << ": phony";
+            out << "build " << ninjaTargetName << ": phony";
             if (!depList.empty())
                 out << " | " << depList;
             out << "\n\n";
@@ -352,7 +352,7 @@ void generate_build(Project &project)
             out << "build";
             for (auto &o : ct.outputs())
                 out << " " << o;
-            out << " " << ninja_target_name(target);
+            out << " " << ninjaTargetName;
             out << ": run_cmd";
             for (auto &i : ct.inputs())
                 out << " " << i;
@@ -379,11 +379,11 @@ void generate_build(Project &project)
         out << " " << ninja_target_name(*t);
     out << "\n\n";
 
-    const auto &install_files = project.installer().files();
-    const auto &install_dirs = project.installer().dirs();
-    const auto &install_targets = project.installer().targets();
+    const auto &installFiles = project.installer().files();
+    const auto &installDirs = project.installer().dirs();
+    const auto &installTargets = project.installer().targets();
 
-    Directory install_root = project.install_dir();
+    Directory installRoot = project.install_dir();
 
     out << "\n# --- Install rules ---\n\n";
     out << "rule install_file\n";
@@ -395,43 +395,43 @@ void generate_build(Project &project)
     out << "  description = INSTALL $dir -> $dest\n\n";
 
     // Emit per-file install edges first, collecting phony targets.
-    std::vector<std::string> phony_targets;
+    std::vector<std::string> phonyTargets;
 
     auto emitInstallFile = [&](std::string_view relDest, const fs::path &src)
     {
-        std::string dest = (install_root.path() / relDest / src.filename()).string();
-        phony_targets.push_back(dest);
+        std::string dest = (installRoot.path() / relDest / src.filename()).string();
+        phonyTargets.push_back(dest);
         out << "build " << dest << ": install_file " << src.string() << "\n\n";
     };
 
-    for (auto &[rel_dest, files] : install_files)
+    for (auto &[rel_dest, files] : installFiles)
         for (const auto &src : files)
             emitInstallFile(rel_dest, src.path());
 
     // target installs → their build-dir artifact
-    for (const Target *t : install_targets)
+    for (const Target *t : installTargets)
     {
         std::string_view subdir = t->type() == TargetType::Executable ? "bin" : "lib";
         emitInstallFile(subdir, ninja_target_name(*t));
     }
 
-    for (auto &[rel_dest, dirs] : install_dirs)
+    for (auto &[rel_dest, dirs] : installDirs)
     {
         for (size_t i = 0; i < dirs.size(); ++i)
         {
             // directory source → tree copy
             auto &src = dirs[i];
             std::string target = "install_" + rel_dest + "_" + std::to_string(i);
-            phony_targets.push_back(target);
+            phonyTargets.push_back(target);
             out << "build " << target << ": install_tree\n";
             out << "  dir = " << src.path().string() << "\n";
-            out << "  dest = " << (install_root.path() / rel_dest).string() << "\n\n";
+            out << "  dest = " << (installRoot.path() / rel_dest).string() << "\n\n";
         }
     }
 
     // Emit the `install` phony target pointing at everything above.
     out << "build install: phony";
-    for (auto &t : phony_targets)
+    for (auto &t : phonyTargets)
         out << " " << t;
     out << "\n\n";
 

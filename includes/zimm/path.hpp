@@ -56,7 +56,7 @@ public:
 
         if (path.empty())
             LOGF("File can not be constructed from empty path = " << path);
-        path = std::filesystem::absolute(std::move(path));
+        path = std::filesystem::absolute(path);
         return File{std::move(path)};
     }
 };

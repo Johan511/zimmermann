@@ -3,7 +3,6 @@
 
 #include <array>
 #include <fstream>
-#include <generator>
 #include <meta>
 #include <optional>
 #include <ranges>
@@ -47,7 +46,6 @@ std::string_view cmake_type_of(TargetType type)
     case TargetType::SharedLibrary:
         return "SHARED";
     case TargetType::HeaderOnlyLibrary:
-        return "INTERFACE";
     case TargetType::ThirdPartyTarget:
         return "INTERFACE";
     case TargetType::CustomTarget:
@@ -167,7 +165,7 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
     ParsedCmakeResult result;
     std::string line;
 
-    auto parse_next =
+    auto parseNext =
         [&, lineNum = 0ull](std::string_view expectedKey) mutable -> std::optional<std::string>
     {
         lineNum++;
@@ -190,7 +188,7 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
         return line.substr(eqPosn + 1);
     };
 
-    static constexpr auto parse_member = [](auto &member, std::string value)
+    static constexpr auto parseMember = [](auto &member, std::string value)
     {
         using MemberType = std::remove_reference_t<decltype(member)>;
         if constexpr (std::same_as<MemberType, std::string>)
@@ -210,11 +208,11 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
         }
         else
         {
-            auto value = parse_next(meta::identifier_of(member));
+            auto value = parseNext(meta::identifier_of(member));
             if (!value)
                 return std::nullopt;
 
-            parse_member(result.[:member:], std::move(*value));
+            parseMember(result.[:member:], std::move(*value));
         }
     }
 
@@ -225,14 +223,14 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
                       std::define_static_array(meta::nonstatic_data_members_of(
                           ^^ImportedTarget, meta::access_context::current())))
         {
-            auto value = parse_next(meta::identifier_of(member));
+            auto value = parseNext(meta::identifier_of(member));
             if (!value)
             {
                 LOGE("CmakeResult: truncated target block");
                 return std::nullopt;
             }
 
-            parse_member(importedTarget.[:member:], std::move(*value));
+            parseMember(importedTarget.[:member:], std::move(*value));
         }
     }
 
@@ -240,7 +238,7 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
 }
 
 // TODO: get rid of conditionals in the wrapper
-static constexpr auto WRAPPER_TEMPLATE = R"CMAKELISTS(
+constexpr auto WRAPPER_TEMPLATE = R"CMAKELISTS(
 cmake_minimum_required(VERSION 3.25)
 project(zimm_find NONE)
 enable_language(C CXX)
@@ -389,10 +387,10 @@ std::string define_dependencies(std::span<const CmakeDependency> deps)
 std::string cmake_cmd(const Directory &scratchDir, std::string_view zimmBuildType,
                       std::span<const Directory> searchDirs)
 {
-    constexpr auto dir_to_str = [](auto &dir) { return dir.path().string(); };
+    constexpr auto dir2Str = [](auto &dir) { return dir.path().string(); };
     std::string prefixPathFlag =
         std::format("-DCMAKE_PREFIX_PATH='{:s}'",
-                    searchDirs | std::views::transform(dir_to_str) | std::views::join_with(';'));
+                    searchDirs | std::views::transform(dir2Str) | std::views::join_with(';'));
     const std::string buildDir = (scratchDir.path() / "build").string();
     const std::string logFile = (scratchDir.path() / "configure.log").string();
     const std::string scratchPath = scratchDir.path().string();
@@ -417,7 +415,7 @@ Directory prefix_dir(const ParsedCmakeResult &result)
     return result.config.empty() ? Directory::make(".") : prefix_dir_of(result.config);
 }
 
-std::optional<ParsedCmakeResult> run_cmake_cmd_and_parse_stdout(std::string_view cmakeCmd,
+std::optional<ParsedCmakeResult> run_cmake_cmd_and_parse_stdout(const std::string &cmakeCmd,
                                                                 const File &stdoutFile)
 {
     if (std::system(cmakeCmd.data()) != 0)
@@ -497,7 +495,7 @@ namespace zimm
 FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(Directory searchPath,
                                                          std::string findPackageArgs,
                                                          std::string buildType)
-    : m_searchDirs({searchPath}), m_findPackageArgs(std::move(findPackageArgs)),
+    : m_searchDirs({std::move(searchPath)}), m_findPackageArgs(std::move(findPackageArgs)),
       m_buildType(std::move(buildType))
 {
 }
@@ -551,9 +549,6 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
     auto zimmTargets = cmakeResult.imported_targets | std::views::transform(Zimmify{*tpt}) |
                        std::views::filter(std::identity{}) /* filter out nullptr */ |
                        std::ranges::to<std::vector>();
-
-    for (Target *t : zimmTargets)
-        add_dependency_rel(tpt, t);
 
     return {tpt, std::move(zimmTargets)};
 }

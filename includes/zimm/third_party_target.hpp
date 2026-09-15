@@ -40,20 +40,20 @@ public:
     ThirdPartyTarget *tpt() { return m_tpt; }
     const ThirdPartyTarget *tpt() const { return m_tpt; }
 
-    std::vector<StaticLibrary *> static_libs(std::string name = "");
-    std::vector<const StaticLibrary *> static_libs(std::string name = "") const;
+    std::vector<StaticLibrary *> static_libs(std::string_view name = "");
+    std::vector<const StaticLibrary *> static_libs(std::string_view name = "") const;
 
-    std::vector<SharedLibrary *> shared_libs(std::string name = "");
-    std::vector<const SharedLibrary *> shared_libs(std::string name = "") const;
+    std::vector<SharedLibrary *> shared_libs(std::string_view name = "");
+    std::vector<const SharedLibrary *> shared_libs(std::string_view name = "") const;
 
-    std::vector<HeaderOnlyLibrary *> ho_libs(std::string name = "");
-    std::vector<const HeaderOnlyLibrary *> ho_libs(std::string name = "") const;
+    std::vector<HeaderOnlyLibrary *> ho_libs(std::string_view name = "");
+    std::vector<const HeaderOnlyLibrary *> ho_libs(std::string_view name = "") const;
 
-    std::vector<Executable *> execs(std::string name = "");
-    std::vector<const Executable *> execs(std::string name = "") const;
+    std::vector<Executable *> execs(std::string_view name = "");
+    std::vector<const Executable *> execs(std::string_view name = "") const;
 
-    std::vector<Target *> targets(std::string name = "");
-    std::vector<const Target *> targets(std::string name = "") const;
+    std::vector<Target *> targets(std::string_view name = "");
+    std::vector<const Target *> targets(std::string_view name = "") const;
 };
 
 class ThirdPartyTarget;
@@ -77,7 +77,7 @@ public:
     {
         static_assert(sizeof...(strategies) > 0);
         ThirdPartyTarget *result{};
-        if (!(... || (result = strategies.attempt(name), result)))
+        if (!(... || (result = strategies.attempt(name), result))) // NOLINT
             LOGI("Failed to make third party target");
         return result;
     }
@@ -105,14 +105,14 @@ public:
 
 struct MatchingDirPredicates
 {
-    using equality = std::equal_to<std::string_view>;
+    using Equality = std::equal_to<std::string_view>;
 
-    class atleast_version
+    class AtLeastVersion
     {
         const std::tuple<uint64_t, uint64_t, uint64_t> majorMinorPatch;
 
     public:
-        atleast_version(uint64_t major = -1, uint64_t minor = -1, uint64_t patch = -1)
+        AtLeastVersion(uint64_t major = -1, uint64_t minor = -1, uint64_t patch = -1) // NOLINT
         {
             (void)major;
             (void)minor;
@@ -131,7 +131,7 @@ struct MatchingDirPredicates
 
 class FindPackageTptStrategy
 {
-    static std::vector<Directory> defaultPaths;
+    static std::span<const Directory> default_paths();
     std::vector<Directory> m_searchDirs;
 
     using MatchingDirPred = std::function<bool(std::string_view /* the search directory */,
@@ -141,9 +141,9 @@ class FindPackageTptStrategy
 
 public:
     // clang-format off
-    FindPackageTptStrategy(Directory searchPath, MatchingDirPred = MatchingDirPredicates::equality{});
-    FindPackageTptStrategy(std::vector<Directory> searchPaths, MatchingDirPred = MatchingDirPredicates::equality{});
-    FindPackageTptStrategy(MatchingDirPred = MatchingDirPredicates::equality{});
+    FindPackageTptStrategy(Directory searchPath, MatchingDirPred = MatchingDirPredicates::Equality{});
+    FindPackageTptStrategy(std::vector<Directory> searchPaths, MatchingDirPred = MatchingDirPredicates::Equality{});
+    FindPackageTptStrategy(MatchingDirPred = MatchingDirPredicates::Equality{});
     // clang-format on
     ThirdPartyTarget *attempt(std::string_view name) const;
 };

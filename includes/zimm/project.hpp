@@ -53,12 +53,13 @@ public:
     std::unordered_set<Target *> seach_all_targets() const;
 
     // feature detection
-    bool try_compile(std::string source, bool link);
-    std::optional<std::string> try_run(std::string source);
-    bool check_header(std::string header);
-    bool check_function_exists(std::string function_name);
-    bool check_symbol_exists(std::string symbol, std::vector<std::string> headers);
-    std::optional<size_t> check_type_size(std::string type, std::vector<std::string> headers);
+    bool try_compile(std::string_view source, bool link);
+    std::optional<std::string> try_run(std::string_view source);
+    bool check_header(std::string_view header);
+    bool check_function_exists(std::string_view function_name);
+    bool check_symbol_exists(std::string_view symbol, const std::vector<std::string> &headers);
+    std::optional<size_t> check_type_size(std::string_view type,
+                                          const std::vector<std::string> &headers);
 
 private:
     Directory m_buildDir;

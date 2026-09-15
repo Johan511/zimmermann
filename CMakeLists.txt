@@ -25,10 +25,10 @@ set(ZIMM_WARNING_FLAGS -Wall -Wextra -Wpedantic -Werror)
 target_compile_options(zimmermann PRIVATE ${ZIMM_WARNING_FLAGS})
 target_compile_options(zimmermann PRIVATE "-freflection")
 
-option(ZIMM_CLANG_TIDY "Analyze zimmermann sources with clang-tidy while building" OFF)
+option(ZIMM_CLANG_TIDY "Analyze zimmermann sources with clang-tidy while building" ON)
 if(ZIMM_CLANG_TIDY)
-    message(WARNING "clang-tidy not supported yet")
-    # find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+    # message(WARNING "clang-tidy not supported yet")
+    find_program(CLANG_TIDY_EXE NAMES clang-tidy)
 else()
     message(WARNING "ZIMM_CLANG_TIDY is ON but clang-tidy was not found")
 endif()
@@ -36,6 +36,10 @@ endif()
 if(CLANG_TIDY_EXE)
     set_property(TARGET zimmermann PROPERTY CXX_CLANG_TIDY
         "${CLANG_TIDY_EXE};--removed-arg=-freflection"
+    )
+    set_source_files_properties(src/config.cpp src/find_cmake_tpt_strategy.cpp 
+        PROPERTIES
+        SKIP_LINTING ON
     )
 endif()
 

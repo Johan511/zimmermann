@@ -15,7 +15,7 @@
 
 namespace zimm
 {
-enum class TargetType
+enum class TargetType : std::uint8_t
 {
     Executable,
     StaticLibrary,
@@ -115,11 +115,11 @@ public:
 
     void add_property(const PublicTag *, PolyProperty property)
     {
-        add_property_impl(m_publicProperties, property);
+        add_property_impl(m_publicProperties, std::move(property));
     }
     void add_property(const PrivateTag *, PolyProperty property)
     {
-        add_property_impl(m_privateProperties, property);
+        add_property_impl(m_privateProperties, std::move(property));
     }
 
     void add_public_property(PolyProperty property)
@@ -156,8 +156,7 @@ public:
 class SharedLibrary : public Library, public detail::SourcesTrait, public detail::LinkTrait
 {
 public:
-    explicit SharedLibrary(std::string name) noexcept
-        : Library(TargetType::SharedLibrary, std::move(name))
+    explicit SharedLibrary(std::string name) : Library(TargetType::SharedLibrary, std::move(name))
     {
         add_property(private_, CompileFlagProperty{"-fPIC"});
     }

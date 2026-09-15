@@ -71,11 +71,11 @@ std::unordered_set<Target *> Project::seach_all_targets() const
 }
 
 //  Feature detection
-bool Project::try_compile(std::string source, bool link)
+bool Project::try_compile(std::string_view source, bool link)
 {
     std::set<std::string> includes;
-    std::set<std::string> compile_flags;
-    std::set<std::string> link_flags;
+    std::set<std::string> compileFlags;
+    std::set<std::string> linkFlags;
 
     for (const auto &prop : m_globalProperties)
     {
@@ -85,10 +85,10 @@ bool Project::try_compile(std::string source, bool link)
             includes.insert(std::get<IncludeProperty>(prop).include_path().path().string());
             break;
         case PropertyType::CompileFlag:
-            compile_flags.insert(std::string{std::get<CompileFlagProperty>(prop).flag()});
+            compileFlags.insert(std::string{std::get<CompileFlagProperty>(prop).flag()});
             break;
         case PropertyType::LinkFlag:
-            link_flags.insert(std::string{std::get<LinkFlagProperty>(prop).flag()});
+            linkFlags.insert(std::string{std::get<LinkFlagProperty>(prop).flag()});
             break;
         default:
             break;
@@ -98,82 +98,82 @@ bool Project::try_compile(std::string source, bool link)
     std::string cxxflags = m_config.cxx_flags;
     for (auto &inc : includes)
         cxxflags += " -I" + inc;
-    for (auto &f : compile_flags)
+    for (auto &f : compileFlags)
         cxxflags += " " + f;
 
     // --- write source file ---
 
     constexpr auto name = "zimm_check";
-    auto src_file = m_featureDetectionDir.file(std::format("{}.cpp", name));
+    auto srcFile = m_featureDetectionDir.file(std::format("{}.cpp", name));
     {
-        std::ofstream src_ofs(src_file.path());
-        if (!src_ofs)
+        std::ofstream srcOfs(srcFile.path());
+        if (!srcOfs)
             return false;
-        src_ofs << source;
+        srcOfs << source;
     }
 
     // --- compile ---
 
-    auto obj_file = m_featureDetectionDir.file(std::format("{}.o", name));
-    auto err_file = m_featureDetectionDir.file(std::format("{}.err", name));
+    auto objFile = m_featureDetectionDir.file(std::format("{}.o", name));
+    auto errFile = m_featureDetectionDir.file(std::format("{}.err", name));
 
-    const auto objStr = obj_file.path().string();
-    const auto errStr = err_file.path().string();
+    const auto objStr = objFile.path().string();
+    const auto errStr = errFile.path().string();
 
     std::string compiler = m_config.toolchain_prefix + "g++";
 
-    auto compile_cmd = std::format("{} {} -c {} -o {} 2>{}", compiler, cxxflags,
-                                   src_file.path().string(), objStr, errStr);
+    auto compileCmd = std::format("{} {} -c {} -o {} 2>{}", compiler, cxxflags,
+                                  srcFile.path().string(), objStr, errStr);
 
-    if (std::system(compile_cmd.c_str()) != 0)
+    if (std::system(compileCmd.c_str()) != 0)
         return false;
 
     if (link)
     {
         std::string ldflags;
-        for (auto &f : link_flags)
+        for (auto &f : linkFlags)
             ldflags += " " + f;
 
-        auto bin_file = m_featureDetectionDir.file(name);
-        const auto binStr = bin_file.path().string();
-        auto link_cmd =
+        auto binFile = m_featureDetectionDir.file(name);
+        const auto binStr = binFile.path().string();
+        auto linkCmd =
             std::format("{} {} {} -o {} 2>>{}", compiler, objStr, ldflags, binStr, errStr);
 
-        if (std::system(link_cmd.c_str()) != 0)
+        if (std::system(linkCmd.c_str()) != 0)
             return false;
     }
 
     return true;
 }
 
-std::optional<std::string> Project::try_run(std::string source)
+std::optional<std::string> Project::try_run(std::string_view source)
 {
-    if (!try_compile(std::move(source), /*link=*/true))
+    if (!try_compile(source, /*link=*/true))
         return std::nullopt;
 
     constexpr auto name = "zimm_check";
 
-    auto bin_file = m_featureDetectionDir.file(name);
-    auto out_file = m_featureDetectionDir.file(std::format("{}.out", name));
-    auto err_file = m_featureDetectionDir.file(std::format("{}.err", name));
+    auto binFile = m_featureDetectionDir.file(name);
+    auto outFile = m_featureDetectionDir.file(std::format("{}.out", name));
+    auto errFile = m_featureDetectionDir.file(std::format("{}.err", name));
 
-    const auto binStr = bin_file.path().string();
-    const auto errStr = err_file.path().string();
+    const auto binStr = binFile.path().string();
+    const auto errStr = errFile.path().string();
 
-    auto run_cmd = std::format("{} > {} 2>>{}", binStr, out_file.path().string(), errStr);
+    auto runCmd = std::format("{} > {} 2>>{}", binStr, outFile.path().string(), errStr);
 
-    if (std::system(run_cmd.c_str()) != 0)
+    if (std::system(runCmd.c_str()) != 0)
         return std::nullopt;
 
-    std::ifstream out_ofs(out_file.path());
-    if (!out_ofs)
+    std::ifstream outOfs(outFile.path());
+    if (!outOfs)
         return std::nullopt;
 
-    std::string result(std::istreambuf_iterator<char>{out_ofs}, std::istreambuf_iterator<char>{});
+    std::string result(std::istreambuf_iterator<char>{outOfs}, std::istreambuf_iterator<char>{});
     return result;
 }
 
-bool Project::check_header(std::string header)
+bool Project::check_header(std::string_view header)
 {
     auto src = std::format("#include <{0}>\n"
                            "int main() {{ return 0; }}\n",
@@ -181,7 +181,7 @@ bool Project::check_header(std::string header)
     return try_compile(std::move(src), /*link=*/false);
 }
 
-bool Project::check_function_exists(std::string function_name)
+bool Project::check_function_exists(std::string_view function_name)
 {
     auto src = std::format("#ifdef __cplusplus\n"
                            "extern \"C\" {{\n"
@@ -195,26 +195,27 @@ bool Project::check_function_exists(std::string function_name)
     return try_compile(std::move(src), /*link=*/true);
 }
 
-bool Project::check_symbol_exists(std::string symbol, std::vector<std::string> headers)
+bool Project::check_symbol_exists(std::string_view symbol, const std::vector<std::string> &headers)
 {
-    std::string header_block;
+    std::string headerBlock;
     for (const auto &h : headers)
-        header_block += std::format("#include <{}>\n", h);
+        headerBlock += std::format("#include <{}>\n", h);
 
     auto src = std::format("{}"
                            "int main() {{\n"
                            "    (void)({});\n"
                            "    return 0;\n"
                            "}}\n",
-                           header_block, symbol);
+                           headerBlock, symbol);
     return try_compile(std::move(src), /*link=*/false);
 }
 
-std::optional<size_t> Project::check_type_size(std::string type, std::vector<std::string> headers)
+std::optional<size_t> Project::check_type_size(std::string_view type,
+                                               const std::vector<std::string> &headers)
 {
-    std::string header_block;
+    std::string headerBlock;
     for (const auto &h : headers)
-        header_block += std::format("#include <{}>\n", h);
+        headerBlock += std::format("#include <{}>\n", h);
 
     auto src = std::format("{}"
                            "#include <cstdio>\n"
@@ -222,7 +223,7 @@ std::optional<size_t> Project::check_type_size(std::string type, std::vector<std
                            "    std::printf(\"%zu\\n\", sizeof({}));\n"
                            "    return 0;\n"
                            "}}\n",
-                           header_block, type);
+                           headerBlock, type);
 
     auto output = try_run(std::move(src));
     if (!output)

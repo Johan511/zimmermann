@@ -2,6 +2,6 @@
 
 namespace zimm
 {
-constexpr class PublicTag *public_ = nullptr;
-constexpr class PrivateTag *private_ = nullptr;
+constexpr struct PublicTag *public_ = nullptr;   // NOLINT(readability-identifier-naming)
+constexpr struct PrivateTag *private_ = nullptr; // NOLINT(readability-identifier-naming)
 } // namespace zimm

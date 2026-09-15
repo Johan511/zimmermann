@@ -1,9 +1,14 @@
 #include "zimm/third_party_target.hpp"
+#include <array>
 #include <ranges>
 
 namespace zimm
 {
-std::vector<Directory> FindPackageTptStrategy::defaultPaths = {Directory::make("/usr")};
+std::span<const Directory> FindPackageTptStrategy::default_paths()
+{
+    static const std::array paths = {Directory::make("/usr")};
+    return paths;
+}
 
 FindPackageTptStrategy::FindPackageTptStrategy(Directory searchPath, MatchingDirPred matchingDir)
     : m_matchingDir(std::move(matchingDir))
@@ -20,7 +25,8 @@ FindPackageTptStrategy::FindPackageTptStrategy(std::vector<Directory> searchPath
 }
 
 FindPackageTptStrategy::FindPackageTptStrategy(MatchingDirPred matchingDir)
-    : m_searchDirs(defaultPaths), m_matchingDir(std::move(matchingDir))
+    : m_searchDirs(default_paths().begin(), default_paths().end()),
+      m_matchingDir(std::move(matchingDir))
 {
 }
 
@@ -135,7 +141,7 @@ Target *ThirdPartyTarget::assume_target(TargetType type, std::string name, std::
 }
 
 template <typename T>
-std::vector<T *> filter(auto &targets, std::optional<TargetType> type, std::string name)
+std::vector<T *> filter(auto &targets, std::optional<TargetType> type, std::string_view name)
 {
     return targets |
            std::views::filter(
@@ -149,51 +155,53 @@ std::vector<T *> filter(auto &targets, std::optional<TargetType> type, std::stri
            std::ranges::to<std::vector>();
 }
 
-std::vector<StaticLibrary *> ThirdPartyTargetManifest::static_libs(std::string name)
+std::vector<StaticLibrary *> ThirdPartyTargetManifest::static_libs(std::string_view name)
 {
-    return filter<StaticLibrary>(m_assumed, TargetType::StaticLibrary, std::move(name));
+    return filter<StaticLibrary>(m_assumed, TargetType::StaticLibrary, name);
 }
-std::vector<SharedLibrary *> ThirdPartyTargetManifest::shared_libs(std::string name)
+std::vector<SharedLibrary *> ThirdPartyTargetManifest::shared_libs(std::string_view name)
 {
-    return filter<SharedLibrary>(m_assumed, TargetType::SharedLibrary, std::move(name));
+    return filter<SharedLibrary>(m_assumed, TargetType::SharedLibrary, name);
 }
-std::vector<HeaderOnlyLibrary *> ThirdPartyTargetManifest::ho_libs(std::string name)
+std::vector<HeaderOnlyLibrary *> ThirdPartyTargetManifest::ho_libs(std::string_view name)
 {
-    return filter<HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary, std::move(name));
+    return filter<HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary, name);
 }
-std::vector<Executable *> ThirdPartyTargetManifest::execs(std::string name)
+std::vector<Executable *> ThirdPartyTargetManifest::execs(std::string_view name)
 {
-    return filter<Executable>(m_assumed, TargetType::Executable, std::move(name));
-}
-
-std::vector<Target *> ThirdPartyTargetManifest::targets(std::string name)
-{
-    return filter<Target>(m_assumed, std::nullopt, std::move(name));
+    return filter<Executable>(m_assumed, TargetType::Executable, name);
 }
 
-std::vector<const StaticLibrary *> ThirdPartyTargetManifest::static_libs(std::string name) const
+std::vector<Target *> ThirdPartyTargetManifest::targets(std::string_view name)
 {
-    return filter<const StaticLibrary>(m_assumed, TargetType::StaticLibrary, std::move(name));
+    return filter<Target>(m_assumed, std::nullopt, name);
 }
 
-std::vector<const SharedLibrary *> ThirdPartyTargetManifest::shared_libs(std::string name) const
+std::vector<const StaticLibrary *>
+ThirdPartyTargetManifest::static_libs(std::string_view name) const
 {
-    return filter<const SharedLibrary>(m_assumed, TargetType::SharedLibrary, std::move(name));
+    return filter<const StaticLibrary>(m_assumed, TargetType::StaticLibrary, name);
 }
 
-std::vector<const HeaderOnlyLibrary *> ThirdPartyTargetManifest::ho_libs(std::string name) const
+std::vector<const SharedLibrary *>
+ThirdPartyTargetManifest::shared_libs(std::string_view name) const
 {
-    return filter<const HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary,
-                                           std::move(name));
+    return filter<const SharedLibrary>(m_assumed, TargetType::SharedLibrary, name);
 }
 
-std::vector<const Executable *> ThirdPartyTargetManifest::execs(std::string name) const
+std::vector<const HeaderOnlyLibrary *>
+ThirdPartyTargetManifest::ho_libs(std::string_view name) const
 {
-    return filter<const Executable>(m_assumed, TargetType::Executable, std::move(name));
+    return filter<const HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary, name);
 }
 
-std::vector<const Target *> ThirdPartyTargetManifest::targets(std::string name) const
+std::vector<const Executable *> ThirdPartyTargetManifest::execs(std::string_view name) const
 {
-    return filter<const Target>(m_assumed, std::nullopt, std::move(name));
+    return filter<const Executable>(m_assumed, TargetType::Executable, name);
+}
+
+std::vector<const Target *> ThirdPartyTargetManifest::targets(std::string_view name) const
+{
+    return filter<const Target>(m_assumed, std::nullopt, name);
 }
 } // namespace zimm
