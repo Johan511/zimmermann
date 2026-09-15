@@ -7,7 +7,10 @@ set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(zimmermann STATIC
+# yaml-cpp/pugixml static archives get linked into the shared lib
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+add_library(zimmermann SHARED
     src/project.cpp
     src/properties.cpp
     src/target.cpp
@@ -52,18 +55,9 @@ add_subdirectory(third_party/pugixml EXCLUDE_FROM_ALL)
 add_dependencies(zimmermann yaml-cpp pugixml-static)
 target_link_libraries(zimmermann PRIVATE yaml-cpp pugixml-static)
 
-set(MRI_FILE "${CMAKE_CURRENT_BINARY_DIR}/merge_zimmermann.mri")
-add_custom_command(OUTPUT ${MRI_FILE} DEPENDS zimmermann yaml-cpp pugixml-static
-    COMMAND ${CMAKE_COMMAND} -E echo "CREATE $<TARGET_FILE:zimmermann>"       >  ${MRI_FILE}
-    COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:zimmermann>"       >> ${MRI_FILE}
-    COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:yaml-cpp>"         >> ${MRI_FILE}
-    COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:pugixml-static>"   >> ${MRI_FILE}
-    COMMAND ${CMAKE_COMMAND} -E echo "SAVE"                                    >> ${MRI_FILE}
-    COMMAND ${CMAKE_COMMAND} -E echo "END"                                     >> ${MRI_FILE}
-    COMMAND ${CMAKE_AR} -M < ${MRI_FILE}
-    COMMENT "Merging yaml-cpp and pugixml into libzimmermann.a..."
-    VERBATIM)
-add_custom_target(merge_zimmermann ALL DEPENDS ${MRI_FILE})
+# export only the zimm:: API; yaml-cpp/pugixml/std internals stay local
+target_link_options(zimmermann PRIVATE
+    "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
 
 target_compile_definitions(zimmermann PRIVATE
     ZIMM_BUILDING_LIB

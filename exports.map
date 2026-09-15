@@ -1,0 +1,6 @@
+{
+  global:
+    extern "C++" { zimm::*; };
+  local:
+    *;
+};
