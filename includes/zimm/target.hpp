@@ -87,8 +87,11 @@ class Target : public detail::AssumedTrait
     const TargetType m_type;
     const std::string m_name;
 
-    std::vector<Target *> m_dependsOn;      // Target depends on all these targets
-    std::vector<Target *> m_isDependencyOf; // These targets depend on Target
+    std::vector<Target *> m_publicDependencies;
+    std::vector<Target *> m_privateDependencies;
+
+    std::vector<Target *> m_publicDependents;
+    std::vector<Target *> m_privateDependents;
 
     std::vector<PolyProperty> m_publicProperties;
     std::vector<PolyProperty> m_privateProperties;
@@ -97,7 +100,6 @@ class Target : public detail::AssumedTrait
 
 protected:
     Target(TargetType type, std::string name) noexcept : m_type(type), m_name(std::move(name)) {}
-    friend void add_dependency_rel(Target *target, Target *dependency);
 
 public:
     virtual ~Target() = default;
@@ -106,8 +108,11 @@ public:
     TargetType type() const noexcept { return m_type; }
 
     // clang-format off
-    std::span<Target * const> dependencies() const noexcept { return m_dependsOn; }
-    std::span<Target * const> dependents() const noexcept { return m_isDependencyOf; }
+    std::span<Target * const> public_dependencies() const noexcept { return m_publicDependencies; }
+    std::span<Target * const> private_dependencies() const noexcept { return m_privateDependencies; }
+
+    std::span<Target * const> public_dependents() const noexcept { return m_publicDependents; }
+    std::span<Target * const> private_dependents() const noexcept { return m_privateDependents; }
 
     std::span<const PolyProperty> public_properties() const noexcept { return m_publicProperties; }
     std::span<const PolyProperty> private_properties() const noexcept { return m_privateProperties; }
@@ -129,6 +134,17 @@ public:
     void add_private_property(PolyProperty property)
     {
         add_property_impl(m_privateProperties, std::move(property));
+    }
+
+    void add_public_dependency(Target *dependency)
+    {
+        dependency->m_publicDependents.push_back(this);
+        m_publicDependencies.push_back(dependency);
+    }
+    void add_private_dependency(Target *dependency)
+    {
+        dependency->m_privateDependents.push_back(this);
+        m_privateDependencies.push_back(dependency);
     }
 };
 

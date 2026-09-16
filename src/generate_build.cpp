@@ -5,6 +5,7 @@
 #include "zimm/third_party_target.hpp"
 #include <fstream>
 #include <queue>
+#include <ranges>
 
 namespace fs = std::filesystem;
 
@@ -63,7 +64,8 @@ std::string get_link_flags(std::span<const PolyProperty> props)
 std::string get_deps_list(const Target &target)
 {
     std::ostringstream oss;
-    for (const auto *dep : target.dependencies())
+    for (const auto *dep : std::views::concat(target.public_dependencies(),
+                                              target.private_dependencies()))
         oss << ninja_target_name(*dep) << ' ';
     return std::move(oss).str();
 }
@@ -113,7 +115,7 @@ std::vector<Target *> top_sort_all_targets(std::ranges::range auto &&allTargets)
 
     for (Target *t : allTargets)
     {
-        auto numDeps = t->dependencies().size();
+        auto numDeps = t->public_dependencies().size() + t->private_dependencies().size();
         if (numDeps == 0)
             visitQueue.push(t);
         inDegreeMap[t] = numDeps;
@@ -126,7 +128,8 @@ std::vector<Target *> top_sort_all_targets(std::ranges::range auto &&allTargets)
         visitQueue.pop();
 
         topologicalOrder.push_back(front);
-        for (Target *dependent : front->dependents())
+        for (Target *dependent : std::views::concat(front->public_dependents(),
+                                                    front->private_dependents()))
             if (--inDegreeMap[dependent] == 0)
                 visitQueue.push(dependent);
     }
@@ -144,7 +147,7 @@ void generate_build(Project &project)
     for (auto tRef : topSortedTargets)
     {
         Target &t = *tRef;
-        for (auto dep : t.dependencies())
+        for (auto dep : t.public_dependencies())
             for (auto &p : dep->public_properties())
                 t.add_property(public_, p);
     }

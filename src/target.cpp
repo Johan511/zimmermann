@@ -9,12 +9,6 @@
 namespace zimm
 {
 
-void add_dependency_rel(Target *target, Target *dependency)
-{
-    target->m_dependsOn.push_back(dependency);
-    dependency->m_isDependencyOf.push_back(target);
-}
-
 void Target::add_property_impl(std::vector<PolyProperty> &properties, PolyProperty property)
 {
     static constexpr auto equals = [](const PolyProperty &a, const PolyProperty &b) -> bool
@@ -75,14 +69,14 @@ std::string to_string(const TargetType &type)
 void detail::LinkTrait::link_with(const PublicTag *, Library *linkLib)
 {
     Target *thisTarget = dynamic_cast<Target *>(this);
-    add_dependency_rel(thisTarget, linkLib);
+    thisTarget->add_public_dependency(linkLib);
     thisTarget->add_property(public_, LinkTargetProperty{linkLib});
 }
 
 void detail::LinkTrait::link_with(const PrivateTag *, Library *linkLib)
 {
     Target *thisTarget = dynamic_cast<Target *>(this);
-    add_dependency_rel(thisTarget, linkLib);
+    thisTarget->add_private_dependency(linkLib);
     thisTarget->add_property(private_, LinkTargetProperty{linkLib});
 }
 

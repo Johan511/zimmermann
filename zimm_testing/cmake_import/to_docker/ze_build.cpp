@@ -49,7 +49,7 @@ ThirdPartyTargetManifest fabricate_cgal_qt6_placeholder()
 {
     ThirdPartyTarget *tpt = ThirdPartyTarget::make("cgal_qt6_placeholder", Directory::make("/usr"));
     zimm::HeaderOnlyLibrary *qt6 = make_header_only_library("CGAL::CGAL_Qt6");
-    add_dependency_rel(qt6, tpt);
+    qt6->add_private_dependency(tpt);
     return {tpt, {qt6}};
 }
 

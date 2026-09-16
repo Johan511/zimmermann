@@ -16,10 +16,13 @@ int main()
     ThirdPartyTargetManifest boostManifest = boostStrategy.attempt("Boost");
     ThirdPartyTarget *boostTpt = boostManifest.tpt();
 
-    // get the Library* to link by name from the populated dependencies
+    // get the Library* to link by name from the manifest's assumed targets
     auto depByName = [](const ThirdPartyTarget *tpt, std::string_view name) -> Library *
     {
-        for (Target *d : tpt->dependencies())
+        for (Target *d : tpt->public_dependents())
+            if (d->name() == name)
+                return dynamic_cast<Library *>(d);
+        for (Target *d : tpt->private_dependents())
             if (d->name() == name)
                 return dynamic_cast<Library *>(d);
         return nullptr;
@@ -48,9 +51,10 @@ int main()
 
     auto app = make_executable("tpt_demo");
     app->add_source(rel_file("main.cpp"));
-    app->link_with(private_, po);
+    app->link_with(public_, po); // public: po's usage requirements upstream to app
     app->link_with(private_, gtestLib);
-    add_dependency_rel(app, httpLibTpt);
+    app->add_public_dependency(gtestTpt); // gtest includes upstream; gtestLib links privately
+    app->add_public_dependency(httpLibTpt);
 
     prj.register_top_level_target(app);
     prj.installer().install_binary(app);

@@ -30,7 +30,7 @@ int main()
     // --- Executable ---
     auto app = make_executable("a");
     app->add_sources({rel_file("a.cpp"), gen->dir().file("adder.cpp")});
-    add_dependency_rel(app, gen);
+    app->add_public_dependency(gen); // gen's public include dir upstreams to app
 
     prj.register_top_level_target(app);
     prj.installer().install_binary(app);
