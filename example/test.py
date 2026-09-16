@@ -126,8 +126,10 @@ def build_zimm(test_dir: str) -> str | None:
         "-std=c++20",
         "-g",
         f"-I{includes}",
-        f"-L{lib_dir}", "-lzimmermann",
         "-Wall", "-Wextra", "-Wpedantic", "-Werror",
+        f"-L{lib_dir}",
+        "-lzimmermann",
+        f"-Wl,-rpath,{lib_dir}",
         "-o", ze_bin,
     ]
     result = subprocess.run(cmd, cwd=resolved)

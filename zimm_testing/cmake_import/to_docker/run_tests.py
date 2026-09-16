@@ -70,10 +70,12 @@ def main() -> int:
 
     prepare_ze_build(ZE_BUILD)
 
-    compileCmd = ["g++", str(ZE_BUILD), "-std=c++26", "-g",
-             f"-I{ZIMM / 'include'}", f"-L{ZIMM / 'lib64'}", "-lzimmermann",
-             "-Wall", "-Wextra", "-Wpedantic", "-Werror",
-             "-o", str(BUILD / "ze_build")]
+    compileCmd = ["g++", str(ZE_BUILD),
+                  "-std=c++26", "-g",
+                 f"-I{ZIMM / 'include'}", f"-L{ZIMM / 'lib64'}", "-lzimmermann",
+                  "-Wall", "-Wextra", "-Wpedantic", "-Werror",
+                 f"-Wl,-rpath,{ZIMM / 'lib64'}",
+                  "-o", str(BUILD / "ze_build")]
 
     if tee_run(compileCmd, BUILD / "compile.log", cwd=BUILD) != 0:
         print(f"FAIL  compile ze_build.cpp — see {BUILD / 'compile.log'}",

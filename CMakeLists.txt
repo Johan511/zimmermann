@@ -62,6 +62,8 @@ target_link_libraries(zimmermann PRIVATE yaml-cpp pugixml-static)
 # export only the zimm:: API; yaml-cpp/pugixml/std internals stay local
 target_link_options(zimmermann PRIVATE
     "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+set_target_properties(zimmermann PROPERTIES LINK_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
 
 target_compile_definitions(zimmermann PRIVATE
     ZIMM_BUILDING_LIB
