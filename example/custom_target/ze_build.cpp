@@ -25,7 +25,7 @@ int main()
     gen->add_input(rel_file("adder.py").path().string());
     gen->add_outputs(
         {gen->dir().file("adder.h").path().string(), gen->dir().file("adder.cpp").path().string()});
-    gen->add_property(public_, IncludeProperty{gen->dir()});
+    gen->add_public_property(IncludeProperty{gen->dir()});
 
     // --- Executable ---
     auto app = make_executable("a");

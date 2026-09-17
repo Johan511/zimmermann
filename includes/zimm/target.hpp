@@ -1,6 +1,5 @@
 #pragma once
 
-#include "definitions.hpp"
 #include "detail/utils.hpp"
 #include "logger.hpp"
 #include "path.hpp"
@@ -65,10 +64,10 @@ public:
 class LinkTrait
 {
 public:
-    void link_with(const PublicTag *, Library *linkLib);
-    void link_with(const PrivateTag *, Library *linkLib);
-    void link_with(const PublicTag *, std::initializer_list<Library *> linkLibs);
-    void link_with(const PrivateTag *, std::initializer_list<Library *> linkLibs);
+    void link_with_public(Library *linkLib);
+    void link_with_private(Library *linkLib);
+    void link_with_public(std::initializer_list<Library *> linkLibs);
+    void link_with_private(std::initializer_list<Library *> linkLibs);
     virtual ~LinkTrait() = default;
 };
 
@@ -118,15 +117,6 @@ public:
     std::span<const PolyProperty> private_properties() const noexcept { return m_privateProperties; }
     // clang-format on
 
-    void add_property(const PublicTag *, PolyProperty property)
-    {
-        add_property_impl(m_publicProperties, std::move(property));
-    }
-    void add_property(const PrivateTag *, PolyProperty property)
-    {
-        add_property_impl(m_privateProperties, std::move(property));
-    }
-
     void add_public_property(PolyProperty property)
     {
         add_property_impl(m_publicProperties, std::move(property));
@@ -174,7 +164,7 @@ class SharedLibrary : public Library, public detail::SourcesTrait, public detail
 public:
     explicit SharedLibrary(std::string name) : Library(TargetType::SharedLibrary, std::move(name))
     {
-        add_property(private_, CompileFlagProperty{"-fPIC"});
+        add_private_property(CompileFlagProperty{"-fPIC"});
     }
 };
 

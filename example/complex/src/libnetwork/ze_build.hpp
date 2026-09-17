@@ -8,6 +8,6 @@ inline auto define_libnetwork(StaticLibrary *core)
 {
     auto lib = make_shared_library("network");
     lib->add_source(rel_file("socket.cpp"));
-    lib->link_with(private_, core);
+    lib->link_with_private(core);
     return lib;
 }

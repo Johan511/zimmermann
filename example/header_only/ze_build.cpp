@@ -13,7 +13,7 @@ int main()
 
     auto app = make_executable("header_only_demo");
     app->add_source(rel_file("main.cpp"));
-    app->link_with(public_, greeter);
+    app->link_with_public(greeter);
 
     prj.register_top_level_target(app);
 

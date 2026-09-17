@@ -9,7 +9,7 @@ int main()
     prj.add_global_property(CompileFlagProperty{"-std=c++23"});
 
     auto helloWorld = make_executable("HelloWorld");
-    helloWorld->add_property(public_, IncludeProperty{rel_dir("include")});
+    helloWorld->add_public_property(IncludeProperty{rel_dir("include")});
     helloWorld->add_source(rel_file("hello_world.cpp"));
 
     prj.register_top_level_target(helloWorld);

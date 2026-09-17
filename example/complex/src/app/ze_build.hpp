@@ -10,6 +10,6 @@ inline auto define_myapp(StaticLibrary *core, StaticLibrary *math, SharedLibrary
 {
     auto app = make_executable("myapp");
     app->add_source(rel_file("main.cpp"));
-    app->link_with(private_, {core, math, network});
+    app->link_with_private({core, math, network});
     return app;
 }

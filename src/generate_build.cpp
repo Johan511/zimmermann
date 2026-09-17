@@ -64,8 +64,8 @@ std::string get_link_flags(std::span<const PolyProperty> props)
 std::string get_deps_list(const Target &target)
 {
     std::ostringstream oss;
-    for (const auto *dep : std::views::concat(target.public_dependencies(),
-                                              target.private_dependencies()))
+    for (const auto *dep :
+         std::views::concat(target.public_dependencies(), target.private_dependencies()))
         oss << ninja_target_name(*dep) << ' ';
     return std::move(oss).str();
 }
@@ -128,8 +128,8 @@ std::vector<Target *> top_sort_all_targets(std::ranges::range auto &&allTargets)
         visitQueue.pop();
 
         topologicalOrder.push_back(front);
-        for (Target *dependent : std::views::concat(front->public_dependents(),
-                                                    front->private_dependents()))
+        for (Target *dependent :
+             std::views::concat(front->public_dependents(), front->private_dependents()))
             if (--inDegreeMap[dependent] == 0)
                 visitQueue.push(dependent);
     }
@@ -149,7 +149,7 @@ void generate_build(Project &project)
         Target &t = *tRef;
         for (auto dep : t.public_dependencies())
             for (auto &p : dep->public_properties())
-                t.add_property(public_, p);
+                t.add_public_property(p);
     }
 
     for (auto t : topSortedTargets)

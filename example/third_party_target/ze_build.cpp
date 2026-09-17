@@ -51,8 +51,8 @@ int main()
 
     auto app = make_executable("tpt_demo");
     app->add_source(rel_file("main.cpp"));
-    app->link_with(public_, po); // public: po's usage requirements upstream to app
-    app->link_with(private_, gtestLib);
+    app->link_with_public(po); // public: po's usage requirements upstream to app
+    app->link_with_private(gtestLib);
     app->add_public_dependency(gtestTpt); // gtest includes upstream; gtestLib links privately
     app->add_public_dependency(httpLibTpt);
 

@@ -63,8 +63,7 @@ std::unordered_set<Target *> Project::seach_all_targets() const
             continue;
         seen.insert(top);
 
-        for (auto dep :
-             std::views::concat(top->public_dependencies(), top->private_dependencies()))
+        for (auto dep : std::views::concat(top->public_dependencies(), top->private_dependencies()))
             if (!seen.contains(dep))
                 stk.push(dep);
     }

@@ -7,8 +7,6 @@
 
 namespace zimm
 {
-struct PublicTag;
-struct PrivateTag;
 class Library;
 
 enum class PropertyType : std::uint8_t

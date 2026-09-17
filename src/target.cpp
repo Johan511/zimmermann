@@ -66,30 +66,30 @@ std::string to_string(const TargetType &type)
     std::unreachable();
 }
 
-void detail::LinkTrait::link_with(const PublicTag *, Library *linkLib)
+void detail::LinkTrait::link_with_public(Library *linkLib)
 {
     Target *thisTarget = dynamic_cast<Target *>(this);
     thisTarget->add_public_dependency(linkLib);
-    thisTarget->add_property(public_, LinkTargetProperty{linkLib});
+    thisTarget->add_public_property(LinkTargetProperty{linkLib});
 }
 
-void detail::LinkTrait::link_with(const PrivateTag *, Library *linkLib)
+void detail::LinkTrait::link_with_private(Library *linkLib)
 {
     Target *thisTarget = dynamic_cast<Target *>(this);
     thisTarget->add_private_dependency(linkLib);
-    thisTarget->add_property(private_, LinkTargetProperty{linkLib});
+    thisTarget->add_private_property(LinkTargetProperty{linkLib});
 }
 
-void detail::LinkTrait::link_with(const PublicTag *, std::initializer_list<Library *> linkLibs)
+void detail::LinkTrait::link_with_public(std::initializer_list<Library *> linkLibs)
 {
     for (auto *linkLib : linkLibs)
-        link_with(public_, linkLib);
+        link_with_public(linkLib);
 }
 
-void detail::LinkTrait::link_with(const PrivateTag *, std::initializer_list<Library *> linkLibs)
+void detail::LinkTrait::link_with_private(std::initializer_list<Library *> linkLibs)
 {
     for (auto *linkLib : linkLibs)
-        link_with(private_, linkLib);
+        link_with_private(linkLib);
 }
 
 } // namespace zimm
