@@ -101,17 +101,9 @@ std::generator<std::string> missing_paths(const Target *t)
             if (!fs::exists(includePath))
                 co_yield includePath.string();
         }
-        else if (auto *linkProp = std::get_if<LinkTargetProperty>(&prop))
-        {
-            auto linkTarget = linkProp->link_lib();
-            if (!linkTarget->assumed_path())
-                throw std::format("LinkTarget='{}' of AssumedTarget='{}' is not assumed",
-                                  to_string(*linkTarget), to_string(*t));
-            auto &linkPath = linkTarget->assumed_path()->path();
-            if (!fs::exists(linkPath))
-                co_yield linkPath.string();
-        }
     }
+
+    // TODO: check link paths, check if cmake_import constructs link dependencies correctly
 }
 
 void check_paths(const ThirdPartyTargetManifest &manifest)

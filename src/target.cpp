@@ -27,9 +27,6 @@ void Target::add_property_impl(std::vector<PolyProperty> &properties, PolyProper
                    std::get<CompileFlagProperty>(b).flag();
         case PropertyType::LinkFlag:
             return std::get<LinkFlagProperty>(a).flag() == std::get<LinkFlagProperty>(b).flag();
-        case PropertyType::LinkTarget:
-            return std::get<LinkTargetProperty>(a).link_lib() ==
-                   std::get<LinkTargetProperty>(b).link_lib();
         }
         return false;
     };
@@ -66,19 +63,43 @@ std::string to_string(const TargetType &type)
     std::unreachable();
 }
 
-void detail::LinkTrait::link_with_public(Library *linkLib)
+void detail::LinkTrait::link_impl(Library *linkLib, bool publicNotPrivate)
 {
     Target *thisTarget = dynamic_cast<Target *>(this);
-    thisTarget->add_public_dependency(linkLib);
-    thisTarget->add_public_property(LinkTargetProperty{linkLib});
+    /*
+        executable/shared -> static and shared library
+        static library -> static library
+    */
+    TargetType thisType = thisTarget->type();
+    TargetType linkLibType = linkLib->type();
+
+    if (thisType == TargetType::Executable || thisType == TargetType::SharedLibrary)
+    {
+        if (linkLibType != TargetType::StaticLibrary && linkLibType != TargetType::SharedLibrary)
+            LOGF(to_string(*thisTarget)
+                 << " can only be linked with Static and Shared Library, not "
+                 << to_string(linkLibType));
+    }
+    else if (thisType == TargetType::StaticLibrary)
+    {
+        if (linkLibType != TargetType::StaticLibrary)
+            LOGF("Static library can only be linked with Static Library, not "
+                 << to_string(linkLibType));
+    }
+    else
+        LOGF("Can not link anything to " << to_string(thisType));
+
+    if (publicNotPrivate)
+        thisTarget->add_public_dependency(linkLib);
+    else
+        thisTarget->add_private_dependency(linkLib);
+
+    m_linkSources.emplace_back(linkLib, publicNotPrivate);
 }
 
-void detail::LinkTrait::link_with_private(Library *linkLib)
-{
-    Target *thisTarget = dynamic_cast<Target *>(this);
-    thisTarget->add_private_dependency(linkLib);
-    thisTarget->add_private_property(LinkTargetProperty{linkLib});
-}
+void detail::LinkTrait::link_with_public(Library *linkLib) { link_impl(linkLib, true); }
+
+void detail::LinkTrait::link_with_private(Library *linkLib) { link_impl(linkLib, false); }
 
 void detail::LinkTrait::link_with_public(std::initializer_list<Library *> linkLibs)
 {

@@ -63,11 +63,24 @@ public:
 
 class LinkTrait
 {
+    struct LinkInfo
+    {
+        Library *linkLib;
+        bool publicNotPrivate;
+    };
+
+    std::vector<LinkInfo> m_linkSources;
+
+    void link_impl(Library *linkLib, bool publicNotPrivate);
+
 public:
     void link_with_public(Library *linkLib);
     void link_with_private(Library *linkLib);
     void link_with_public(std::initializer_list<Library *> linkLibs);
     void link_with_private(std::initializer_list<Library *> linkLibs);
+
+    std::span<const LinkInfo> link_sources() const noexcept { return m_linkSources; }
+
     virtual ~LinkTrait() = default;
 };
 

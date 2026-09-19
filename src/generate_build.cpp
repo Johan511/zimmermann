@@ -36,7 +36,7 @@ std::string ninja_target_name(const Target &target)
     case TargetType::CustomTarget:
         return std::format("{}_ct", target.name());
     }
-    return "Unknown";
+    return "Unknown:" + to_string(target);
 }
 
 std::string get_compile_flags(std::span<const PolyProperty> props)
@@ -67,21 +67,6 @@ std::string get_deps_list(const Target &target)
     for (const auto *dep :
          std::views::concat(target.public_dependencies(), target.private_dependencies()))
         oss << ninja_target_name(*dep) << ' ';
-    return std::move(oss).str();
-}
-
-std::string get_link_sources(std::span<const PolyProperty> props)
-{
-    std::ostringstream oss;
-    for (const auto &prop : props)
-    {
-        auto linkLib = std::get_if<LinkTargetProperty>(&prop);
-        if (!linkLib)
-            continue;
-        if (linkLib->link_lib()->type() == TargetType::HeaderOnlyLibrary)
-            continue;
-        oss << ninja_target_name(*linkLib->link_lib()) << " ";
-    }
     return std::move(oss).str();
 }
 
@@ -138,6 +123,23 @@ std::vector<Target *> top_sort_all_targets(std::ranges::range auto &&allTargets)
         LOGF("fold failed because graph has cycles");
     return topologicalOrder;
 }
+
+std::string link_trait_to_binary_link_flags(const detail::LinkTrait *linkTrait)
+{
+    std::string linkFlags;
+    for (auto linkInfo : linkTrait->link_sources())
+    {
+        auto linkLib = linkInfo.linkLib;
+        if (linkLib->type() == TargetType::StaticLibrary)
+            linkFlags +=
+                "-Wl,--whole-archive " + ninja_target_name(*linkLib) + " -Wl,--no-whole-archive ";
+        else if (linkLib->type() == TargetType::SharedLibrary)
+            // TODO: figure out rpaths
+            linkFlags += ninja_target_name(*linkLib) + ' ';
+    }
+    return linkFlags;
+}
+
 } // namespace
 
 void generate_build(Project &project)
@@ -203,7 +205,12 @@ void generate_build(Project &project)
     out << "  description = CC $out\n\n";
 
     out << "rule ar\n";
-    out << "  command = " << ar << " rcs $out $in\n";
+    out << "  command = rm -f $out && { "
+           R"(echo "create $out"; )"
+           R"(printf "addmod %s\n" $objs; )"
+           R"(printf "addlib %s\n" $libs; )"
+           R"(echo "save"; echo "end"; } | )"
+        << ar << " -M\n";
     out << "  description = AR $out\n\n";
 
     out << "# `$in` is objects to be linked together\n";
@@ -282,42 +289,47 @@ void generate_build(Project &project)
             }
         }
 
-        std::string linkSourcesNinjaNames = get_link_sources(target.public_properties()) +
-                                            get_link_sources(target.private_properties());
-
         switch (target.type())
         {
         case TargetType::StaticLibrary:
         {
-            auto &lib = static_cast<const StaticLibrary &>(target);
-            out << "build " << ninja_target_name(lib) << ": ar " << sourceObjectsNinjaNames << " "
-                << linkSourcesNinjaNames;
+            auto linkTrait = dynamic_cast<const detail::LinkTrait *>(targetPtr);
+            std::string linkLibNames;
+            for (auto linkLibName :
+                 linkTrait->link_sources() |
+                     std::views::transform([](const auto &li)
+                                           { return ninja_target_name(*li.linkLib); }))
+                linkLibNames += linkLibName + ' ';
+            out << "build " << ninjaTargetName << ": ar " << sourceObjectsNinjaNames << ' '
+                << linkLibNames;
             if (!depsEnsured)
                 out << " | " << depList;
-            out << "\n\n";
+            out << '\n';
+            out << "  objs =" << sourceObjectsNinjaNames << '\n';
+            out << "  libs = " << linkLibNames << "\n\n";
             break;
         }
         case TargetType::SharedLibrary:
         {
-            auto &lib = static_cast<const SharedLibrary &>(target);
-            out << "build " << ninja_target_name(lib) << ": link " << sourceObjectsNinjaNames;
+            out << "build " << ninjaTargetName << ": link " << sourceObjectsNinjaNames;
             if (!depsEnsured)
                 out << " | " << depList;
             out << '\n';
             out << "  ldflags = -shared " << globalLinkFlags << " " << localLinkFlags << "\n";
-            out << "  libs = -Wl,--whole-archive " << linkSourcesNinjaNames
-                << "-Wl,--no-whole-archive\n\n";
+
+            auto linkTrait = dynamic_cast<const detail::LinkTrait *>(targetPtr);
+            out << "  libs = " << link_trait_to_binary_link_flags(linkTrait) << "\n\n";
             break;
         }
         case TargetType::Executable:
         {
-            auto &exec = static_cast<const Executable &>(target);
-            out << "build " << ninja_target_name(exec) << ": link " << sourceObjectsNinjaNames
-                << " " << linkSourcesNinjaNames;
+            auto linkTrait = dynamic_cast<const detail::LinkTrait *>(targetPtr);
+            out << "build " << ninjaTargetName << ": link " << sourceObjectsNinjaNames;
             if (!depsEnsured)
                 out << " | " << depList;
             out << '\n';
-            out << "  ldflags = " << globalLinkFlags << " " << localLinkFlags << "\n\n";
+            out << "  ldflags = " << globalLinkFlags << " " << localLinkFlags << " "
+                << link_trait_to_binary_link_flags(linkTrait) << "\n\n";
             break;
         }
         case TargetType::HeaderOnlyLibrary:
