@@ -1,6 +1,6 @@
 #include "core/logging.hpp"
-#include <print>
-
+#include <format>
+#include <iostream>
 namespace core
 {
 
@@ -22,7 +22,7 @@ void log(Level level, std::string_view message)
         return "[???]";
     };
 
-    std::println("{} {}", level_str(level), message);
+    std::cout << std::format("{} {}", level_str(level), message) << '\n';
 }
 
 } // namespace core

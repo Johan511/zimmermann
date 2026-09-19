@@ -27,7 +27,6 @@ target_compile_options(zimmermann PRIVATE "-freflection")
 
 option(ZIMM_CLANG_TIDY "Analyze zimmermann sources with clang-tidy while building" ON)
 if(ZIMM_CLANG_TIDY)
-    # message(WARNING "clang-tidy not supported yet")
     find_program(CLANG_TIDY_EXE NAMES clang-tidy)
 else()
     message(WARNING "ZIMM_CLANG_TIDY is ON but clang-tidy was not found")

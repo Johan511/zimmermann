@@ -1,3 +1,2 @@
-#include <print>
-
-int main() { std::println("Test runner example"); }
+#include <iostream>
+int main() { std::cout << "Test runner example\n"; }

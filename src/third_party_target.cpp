@@ -112,12 +112,10 @@ SharedLibrary *ThirdPartyTarget::assume_shared_library(std::string name, std::st
     return target;
 }
 
-HeaderOnlyLibrary *ThirdPartyTarget::assume_ho_library(std::string name, std::string path)
+HeaderOnlyLibrary *ThirdPartyTarget::assume_ho_library(std::string name)
 {
     auto target = make_header_only_library(std::move(name));
     target->add_private_dependency(this);
-    // header-only targets have assumed path; the path names their include dir
-    target->add_public_property(IncludeProperty{Directory::make(m_dir.path() / std::move(path))});
     return target;
 }
 
@@ -132,7 +130,7 @@ Target *ThirdPartyTarget::assume_target(TargetType type, std::string name, std::
     case TargetType::SharedLibrary:
         return assume_shared_library(std::move(name), std::move(path));
     case TargetType::HeaderOnlyLibrary:
-        return assume_ho_library(std::move(name), std::move(path));
+        return assume_ho_library(std::move(name));
     default:
         LOGE("ThirdPartyTarget::assume_target: unsupported TargetType " << to_string(type)
                                                                         << " for '" << name << "'");
@@ -140,68 +138,33 @@ Target *ThirdPartyTarget::assume_target(TargetType type, std::string name, std::
     }
 }
 
-template <typename T>
-std::vector<T *> filter(auto &targets, std::optional<TargetType> type, std::string_view name)
+template <typename TargetT, TargetType type>
+TargetT *impl(const auto &assumed, std::string_view name) noexcept
 {
-    return targets |
-           std::views::filter(
-               [&](const Target *t)
-               {
-                   if (type && t->type() != *type)
-                       return false;
-                   return name.empty() || t->name() == name;
-               }) |
-           std::views::transform([](Target *t) { return static_cast<T *>(t); }) |
-           std::ranges::to<std::vector>();
+    auto it = std::ranges::find_if(assumed, [name](const Target *t)
+                                   { return t->type() == type && t->name() == name; });
+    if (it == std::ranges::end(assumed))
+        return nullptr;
+    return static_cast<TargetT *>(*it);
 }
 
-std::vector<StaticLibrary *> ThirdPartyTargetManifest::static_libs(std::string_view name)
+StaticLibrary *ThirdPartyTargetManifest::static_lib(std::string_view name) const noexcept
 {
-    return filter<StaticLibrary>(m_assumed, TargetType::StaticLibrary, name);
-}
-std::vector<SharedLibrary *> ThirdPartyTargetManifest::shared_libs(std::string_view name)
-{
-    return filter<SharedLibrary>(m_assumed, TargetType::SharedLibrary, name);
-}
-std::vector<HeaderOnlyLibrary *> ThirdPartyTargetManifest::ho_libs(std::string_view name)
-{
-    return filter<HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary, name);
-}
-std::vector<Executable *> ThirdPartyTargetManifest::execs(std::string_view name)
-{
-    return filter<Executable>(m_assumed, TargetType::Executable, name);
+    return impl<StaticLibrary, TargetType::StaticLibrary>(m_assumed, name);
 }
 
-std::vector<Target *> ThirdPartyTargetManifest::targets(std::string_view name)
+SharedLibrary *ThirdPartyTargetManifest::shared_lib(std::string_view name) const noexcept
 {
-    return filter<Target>(m_assumed, std::nullopt, name);
+    return impl<SharedLibrary, TargetType::SharedLibrary>(m_assumed, name);
 }
+HeaderOnlyLibrary *ThirdPartyTargetManifest::ho_lib(std::string_view name) const noexcept
+{
+    return impl<HeaderOnlyLibrary, TargetType::HeaderOnlyLibrary>(m_assumed, name);
+}
+Executable *ThirdPartyTargetManifest::exec(std::string_view name) const noexcept
+{
+    return impl<Executable, TargetType::Executable>(m_assumed, name);
+}
+std::span<Target *const> ThirdPartyTargetManifest::targets() const noexcept { return m_assumed; }
 
-std::vector<const StaticLibrary *>
-ThirdPartyTargetManifest::static_libs(std::string_view name) const
-{
-    return filter<const StaticLibrary>(m_assumed, TargetType::StaticLibrary, name);
-}
-
-std::vector<const SharedLibrary *>
-ThirdPartyTargetManifest::shared_libs(std::string_view name) const
-{
-    return filter<const SharedLibrary>(m_assumed, TargetType::SharedLibrary, name);
-}
-
-std::vector<const HeaderOnlyLibrary *>
-ThirdPartyTargetManifest::ho_libs(std::string_view name) const
-{
-    return filter<const HeaderOnlyLibrary>(m_assumed, TargetType::HeaderOnlyLibrary, name);
-}
-
-std::vector<const Executable *> ThirdPartyTargetManifest::execs(std::string_view name) const
-{
-    return filter<const Executable>(m_assumed, TargetType::Executable, name);
-}
-
-std::vector<const Target *> ThirdPartyTargetManifest::targets(std::string_view name) const
-{
-    return filter<const Target>(m_assumed, std::nullopt, name);
-}
 } // namespace zimm

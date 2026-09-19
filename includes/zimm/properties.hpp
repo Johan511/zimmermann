@@ -14,7 +14,6 @@ enum class PropertyType : std::uint8_t
     Include,
     CompileFlag,
     LinkFlag,
-    LinkTarget,
 };
 
 class IncludeProperty
@@ -47,24 +46,7 @@ public:
     PropertyType type() const noexcept { return PropertyType::LinkFlag; }
 };
 
-namespace detail
-{
-class LinkTrait;
-} // namespace detail
-
-class LinkTargetProperty
-{
-    friend detail::LinkTrait;
-    const Library *m_linkLib;
-    explicit LinkTargetProperty(const Library *target);
-
-public:
-    const Library *link_lib() const noexcept { return m_linkLib; }
-    PropertyType type() const noexcept { return PropertyType::LinkTarget; }
-};
-
-using PolyProperty =
-    std::variant<IncludeProperty, CompileFlagProperty, LinkFlagProperty, LinkTargetProperty>;
+using PolyProperty = std::variant<IncludeProperty, CompileFlagProperty, LinkFlagProperty>;
 
 inline PropertyType prop_type(const PolyProperty &p)
 {

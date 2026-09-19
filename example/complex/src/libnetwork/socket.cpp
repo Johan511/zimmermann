@@ -1,6 +1,9 @@
 #include "network/socket.hpp"
 #include "core/logging.hpp"
 
+#include <format>
+#include <iostream>
+
 namespace network
 {
 
@@ -20,7 +23,8 @@ void Socket::disconnect()
 void Socket::send(std::string_view data) const
 {
     if (m_connected)
-        std::println("Sent {} bytes to {}:{}", data.size(), m_addr.host, m_addr.port);
+        std::cout << "Sent " << data.size() << " bytes to " << m_addr.host << ':' << m_addr.port
+                  << '\n';
 }
 
 } // namespace network

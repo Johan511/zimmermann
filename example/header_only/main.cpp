@@ -1,4 +1,4 @@
 #include "greeter.hpp"
-#include <print>
+#include <iostream>
 
-int main() { std::println("{}", GREETING); }
+int main() { std::cout << std::format("{}", GREETING) << '\n'; }

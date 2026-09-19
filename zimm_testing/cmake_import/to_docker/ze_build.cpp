@@ -101,17 +101,9 @@ std::generator<std::string> missing_paths(const Target *t)
             if (!fs::exists(includePath))
                 co_yield includePath.string();
         }
-        else if (auto *linkProp = std::get_if<LinkTargetProperty>(&prop))
-        {
-            auto linkTarget = linkProp->link_lib();
-            if (!linkTarget->assumed_path())
-                throw std::format("LinkTarget='{}' of AssumedTarget='{}' is not assumed",
-                                  to_string(*linkTarget), to_string(*t));
-            auto &linkPath = linkTarget->assumed_path()->path();
-            if (!fs::exists(linkPath))
-                co_yield linkPath.string();
-        }
     }
+
+    // TODO: check link paths, check if cmake_import constructs link dependencies correctly
 }
 
 void check_paths(const ThirdPartyTargetManifest &manifest)
@@ -162,7 +154,7 @@ int test_packages()
                         return FindCmakePackageTptStrategy::Dependency{iter->second};
                     }) |
                 std::ranges::to<std::vector>();
-            auto searchPaths = pkg.searchDirs | std::views::transform(&Directory::make) |
+            auto searchPaths = pkg.searchDirs | std::views::transform(Directory::Make{}) |
                                std::ranges::to<std::vector>();
             FindCmakePackageTptStrategy strategy{searchPaths, std::string{pkg.cmakeArgs},
                                                  "relwithdebinfo"};
@@ -185,10 +177,10 @@ int test_packages()
         }
     }
 
-    std::cout << "\n==== summary ====" << std::endl;
+    std::cout << "\n==== summary ====" << '\n';
     for (const std::string &line : summary)
-        std::cout << line << std::endl;
-    std::cout << std::format("\n{} pass, {} fail", passCount, failCount) << std::endl;
+        std::cout << line << '\n';
+    std::cout << std::format("\n{} pass, {} fail", passCount, failCount) << '\n' << std::flush;
     return failCount == 0 ? 0 : 1;
 }
 

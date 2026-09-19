@@ -1,7 +1,3 @@
-#include <print>
+#include <iostream>
 
-int main()
-{
-    std::println("PASS: basic test");
-    return 0;
-}
+int main() { std::cout << "PASS: basic test\n"; }

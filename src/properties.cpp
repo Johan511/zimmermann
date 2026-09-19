@@ -9,6 +9,4 @@ IncludeProperty::IncludeProperty(Directory includePath) : m_includePath(std::mov
 CompileFlagProperty::CompileFlagProperty(std::string_view flag) : m_flags(std::string{flag}) {}
 
 LinkFlagProperty::LinkFlagProperty(std::string_view flag) : m_flags(std::string{flag}) {}
-
-LinkTargetProperty::LinkTargetProperty(const Library *target) : m_linkLib(target) {}
 } // namespace zimm
