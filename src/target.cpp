@@ -43,7 +43,9 @@ std::string to_string(const Target &target)
     return std::format("{}:{}", to_string(target.type()), target.name());
 }
 
-std::string to_string(const TargetType &type)
+std::string to_string(const Target *target) { return to_string(*target); }
+
+std::string to_string(TargetType type)
 {
     switch (type)
     {
@@ -78,13 +80,18 @@ void detail::LinkTrait::link_impl(Library *linkLib, bool publicNotPrivate)
         if (linkLibType != TargetType::StaticLibrary && linkLibType != TargetType::SharedLibrary)
             LOGF(to_string(*thisTarget)
                  << " can only be linked with Static and Shared Library, not "
-                 << to_string(linkLibType));
+                 << to_string(linkLib));
     }
     else if (thisType == TargetType::StaticLibrary)
     {
         if (linkLibType != TargetType::StaticLibrary)
-            LOGF("Static library can only be linked with Static Library, not "
-                 << to_string(linkLibType));
+        {
+            // TODO: figure out how to deal with shared libraries linking into static libraries
+            LOGE("Static library (" << to_string(thisTarget)
+                                    << ") can only be linked with Static Library, not "
+                                    << to_string(linkLib));
+            return;
+        }
     }
     else
         LOGF("Can not link anything to " << to_string(thisType));

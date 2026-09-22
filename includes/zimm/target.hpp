@@ -24,10 +24,6 @@ enum class TargetType : std::uint8_t
     CustomTarget,
 };
 
-std::string to_string(const TargetType &);
-class Target;
-std::string to_string(const Target &);
-
 class ThirdPartyTarget;
 namespace detail
 {
@@ -260,5 +256,9 @@ inline CustomTarget<T> *make_custom_target(std::string name, Directory dir)
 {
     return new CustomTarget<T>{std::move(name), std::move(dir)};
 }
+
+std::string to_string(TargetType);
+std::string to_string(const Target &);
+std::string to_string(const Target *);
 
 } // namespace zimm

@@ -55,103 +55,30 @@ std::string_view cmake_type_of(TargetType type)
     return "";
 }
 
-// Derive the package prefix from the found <Name>_CONFIG path, e.g.
-//   <prefix>/lib/cmake/<name>/<name>Config.cmake  →  <prefix>
-Directory prefix_dir_of(const std::string &configPath)
-{
-    namespace fs = std::filesystem;
-    fs::path p = fs::path{configPath}.parent_path().parent_path(); // strip <file> and <name>/
-
-    const auto isKnown = [](const fs::path &q)
-    {
-        const auto d = q.filename().string();
-        return d == "lib" || d == "share" || d == "cmake";
-    };
-    while (isKnown(p) && p.has_parent_path())
-        p = p.parent_path();
-
-    if (p.empty())
-    {
-        LOGW("FindCmakePackageTptStrategy: could not derive a prefix from config path '"
-             << configPath << "' — using '.' (cosmetic; the package's cmds are empty anyway)");
-        return Directory::make(".");
-    }
-    return Directory::make(p.string());
-}
-
-std::string resolve_against_config(std::string_view dir, std::string_view configPath)
-{
-    namespace fs = std::filesystem;
-    fs::path p{dir};
-    if (p.is_relative())
-    {
-        fs::path base = fs::path{configPath}.parent_path();
-        p = base / p;
-        LOGW("FindCmakePackageTptStrategy: relative include dir '" << dir << "' resolved against '"
-                                                                   << base.string() << "'");
-    }
-    return p.string();
-}
-
-std::string normalize_lib_entry(std::string_view entry)
-{
-    if (entry.empty())
-        return {};
-    if (entry.starts_with("-l"))
-        return std::string{entry};
-    if (entry.find('/') != std::string_view::npos)
-        return std::string{entry}; // path-ish
-    LOGI("FindCmakePackageTptStrategy: bare library name '" << entry << "' normalized to '-l"
-                                                            << entry << "'");
-    return std::format("-l{}", entry);
-}
-
 struct ImportedTarget
 {
     std::string name;
-    std::string type;
     std::string location;
-    std::string implib;
-    std::string soname;
-    std::vector<std::string> include_dirs;
-    std::vector<std::string> system_include_dirs;
+    std::string type;
+    std::vector<std::string> includeDirs;
+    std::vector<std::string> systemIncludeDirs;
     std::vector<std::string> defs;
-    std::vector<std::string> compile_opts;
-    std::vector<std::string> link_dirs;
-    std::vector<std::string> link_opts;
-    std::vector<std::string> link_libs_direct;
+    std::vector<std::string> compileFlags;
+    std::vector<std::string> linkFlags;
+    std::vector<std::string> linkDirs;
+    std::vector<std::string> linkLibs;
 };
 
 struct ParsedCmakeResult
 {
-    std::string package;
-    std::string config;
-    std::string dir;
-    std::vector<std::string> include_dirs;
+    std::string packageName;
+    std::string configPath;
+    std::string configDir;
+    std::vector<std::string> includeDirs;
     std::vector<std::string> libraries;
 
-    std::vector<ImportedTarget> imported_targets;
+    std::vector<ImportedTarget> importedTargets;
 };
-
-std::optional<ParsedCmakeResult> normalize(ParsedCmakeResult cmakeResult)
-{
-    for (ImportedTarget &iTgt : cmakeResult.imported_targets)
-    {
-        if (iTgt.type == "UNKNOWN_LIBRARY")
-        {
-            const std::string ext = fs::path{iTgt.location}.extension().string();
-
-            if (iTgt.location.empty())
-                iTgt.type = "INTERFACE_LIBRARY";
-            else if (ext == ".a" || ext == ".lib")
-                iTgt.type = "STATIC_LIBRARY";
-            else if (ext == ".so" || ext == ".dll")
-                iTgt.type = "SHARED_LIBRARY";
-        }
-    }
-
-    return cmakeResult;
-}
 
 std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResultsFile)
 {
@@ -203,7 +130,7 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
     template for (constexpr auto member : std::define_static_array(meta::nonstatic_data_members_of(
                       ^^ParsedCmakeResult, meta::access_context::current())))
     {
-        if constexpr (meta::identifier_of(member) == "imported_targets")
+        if constexpr (meta::identifier_of(member) == "importedTargets")
         {
         }
         else
@@ -218,7 +145,7 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
 
     while (in.peek() != std::char_traits<char>::eof())
     {
-        auto &importedTarget = result.imported_targets.emplace_back();
+        auto &importedTarget = result.importedTargets.emplace_back();
         template for (constexpr auto member :
                       std::define_static_array(meta::nonstatic_data_members_of(
                           ^^ImportedTarget, meta::access_context::current())))
@@ -234,7 +161,22 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
         }
     }
 
-    return normalize(std::move(result));
+    for (ImportedTarget &iTgt : result.importedTargets)
+    {
+        if (iTgt.type == "UNKNOWN_LIBRARY")
+        {
+            const std::string ext = fs::path{iTgt.location}.extension().string();
+
+            if (iTgt.location.empty())
+                iTgt.type = "INTERFACE_LIBRARY";
+            else if (ext == ".a" || ext == ".lib")
+                iTgt.type = "STATIC_LIBRARY";
+            else if (ext == ".so" || ext == ".dll")
+                iTgt.type = "SHARED_LIBRARY";
+        }
+    }
+
+    return result;
 }
 
 // TODO: get rid of conditionals in the wrapper
@@ -246,20 +188,11 @@ enable_language(C CXX)
 find_package({0} CONFIG REQUIRED {1})
 
 set(_content "")
-string(TOUPPER "{0}" _zimm_upper)
-string(APPEND _content "package={0}\n")
-string(APPEND _content "config=${{{0}_CONFIG}}\n")
-string(APPEND _content "dir=${{{0}_DIR}}\n")
-set(_pkg_inc_dirs "${{{0}_INCLUDE_DIRS}}")
-if(_pkg_inc_dirs STREQUAL "")
-  set(_pkg_inc_dirs "${{${{_zimm_upper}}_INCLUDE_DIRS}}")
-endif()
-string(APPEND _content "include_dirs=${{_pkg_inc_dirs}}\n")
-set(_pkg_libs "${{{0}_LIBRARIES}}")
-if(_pkg_libs STREQUAL "")
-  set(_pkg_libs "${{${{_zimm_upper}}_LIBRARIES}}")
-endif()
-string(APPEND _content "libraries=${{_pkg_libs}}\n")
+string(APPEND _content "packageName={0}\n")
+string(APPEND _content "configPath=${{{0}_CONFIG}}\n")
+string(APPEND _content "configDir=${{{0}_DIR}}\n")
+string(APPEND _content "includeDirs=${{{0}_INCLUDE_DIRS}}\n")
+string(APPEND _content "libraries=${{{0}_LIBRARIES}}\n")
 
 get_property(_imported DIRECTORY "${{CMAKE_CURRENT_SOURCE_DIR}}" PROPERTY IMPORTED_TARGETS)
 
@@ -269,33 +202,24 @@ foreach(_tgt IN LISTS _imported)
   if(_zimm_injected)
     continue()
   endif()
-  get_target_property(_type "${{_tgt}}" TYPE)
+
   add_library("zimm_wrap_${{_i}}" INTERFACE)
   target_link_libraries("zimm_wrap_${{_i}}" INTERFACE "${{_tgt}}")
+
   string(APPEND _content "name=${{_tgt}}\n")
-  string(APPEND _content "type=${{_type}}\n")
   string(APPEND _content "location=$<TARGET_PROPERTY:${{_tgt}},LOCATION>\n")
-  # string(APPEND _content "location_fallback=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_LOCATION>\n")
-  string(APPEND _content "implib=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_IMPLIB>\n")
-  string(APPEND _content "soname=$<TARGET_PROPERTY:${{_tgt}},IMPORTED_SONAME>\n")
-  string(APPEND _content "include_dirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_INCLUDE_DIRECTORIES>,;>\n")
-  string(APPEND _content "system_include_dirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>,;>\n")
+  string(APPEND _content "type=$<TARGET_PROPERTY:${{_tgt}},TYPE>\n")
+  string(APPEND _content "includeDirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_INCLUDE_DIRECTORIES>,;>\n")
+  string(APPEND _content "systemIncludeDirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>,;>\n")
   string(APPEND _content "defs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_COMPILE_DEFINITIONS>,;>\n")
-  get_target_property(_zimm_copt "${{_tgt}}" INTERFACE_COMPILE_OPTIONS)
-  if(_zimm_copt MATCHES "NOTFOUND")
-    set(_zimm_copt "")
-  endif()
-  # genex-bearing values would make the file(GENERATE) content vary per evaluation pass
-  if(_zimm_copt MATCHES "\\$<")
-    set(_zimm_copt "")
-  endif()
-  string(APPEND _content "compile_opts=${{_zimm_copt}}\n")
-  string(APPEND _content "link_dirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_LINK_DIRECTORIES>,;>\n")
-  string(APPEND _content "link_opts=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_LINK_OPTIONS>,;>\n")
-  string(APPEND _content "link_libs_direct=$<JOIN:$<TARGET_PROPERTY:${{_tgt}},INTERFACE_LINK_LIBRARIES>,;>\n")
+  string(APPEND _content "compileFlags=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_COMPILE_OPTIONS>,;>\n")
+  string(APPEND _content "linkFlags=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_LINK_OPTIONS>,;>\n")
+  string(APPEND _content "linkDirs=$<JOIN:$<TARGET_PROPERTY:zimm_wrap_${{_i}},INTERFACE_LINK_DIRECTORIES>,;>\n")
+  string(APPEND _content "linkLibs=$<TARGET_GENEX_EVAL:zimm_wrap_${{_i}},$<JOIN:$<TARGET_PROPERTY:${{_tgt}},INTERFACE_LINK_LIBRARIES>,;>>\n")
   math(EXPR _i "${{_i}} + 1")
 endforeach()
-file(GENERATE OUTPUT "{2}/vars_$<CONFIG>.txt" CONTENT "${{_content}}")
+# // TODO: we always dont want CXX
+file(GENERATE OUTPUT "{2}/vars_$<CONFIG>.txt" CONTENT "${{_content}}" CONDITION "$<COMPILE_LANGUAGE:CXX>")
 )CMAKELISTS";
 // clang-format on
 
@@ -308,10 +232,6 @@ void target_to_cmake(const Target *t, std::ostringstream &oss)
         set_target_properties({cmakeName} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES {includeDirs})
         set_target_properties({cmakeName} PROPERTIES INTERFACE_COMPILE_OPTIONS {compileFlags})
         set_target_properties({cmakeName} PROPERTIES INTERFACE_LINK_LIBRARIES {linkFlags})
-
-        If the found package's own find chain keeps the stub (e.g. FindThreads'
-        `if(NOT TARGET Threads::Threads)` guard), the stub is the only definition in play —
-        so it must carry the dep's full usage requirements, not just its include dirs.
     */
     const std::string_view cmakeName = t->name();
 
@@ -337,37 +257,41 @@ void target_to_cmake(const Target *t, std::ostringstream &oss)
         oss << std::format("set_target_properties({} PROPERTIES IMPORTED_LOCATION {})\n", cmakeName,
                            location);
 
-    std::ostringstream incDirs, compileFlags, linkFlags;
+    std::string incDirs, compileFlags, linkFlags;
     for (const auto &prop : t->public_properties())
     {
         if (auto *p = std::get_if<IncludeProperty>(&prop))
-            incDirs << p->include_path().path().string() << ';';
+        {
+            incDirs += p->include_path().path().string();
+            incDirs += ';';
+        }
         else if (auto *p = std::get_if<CompileFlagProperty>(&prop))
-            compileFlags << p->flag() << ' ';
+        {
+            compileFlags += p->flag();
+            compileFlags += ';';
+        }
         else if (auto *p = std::get_if<LinkFlagProperty>(&prop))
-            linkFlags << p->flag() << ' ';
+        {
+            linkFlags += p->flag();
+            linkFlags += ';';
+        }
     }
-
-    constexpr auto stringabunga = [](std::ostringstream oss)
-    {
-        std::string s = std::move(oss).str();
-        if (!s.empty())
-            s.pop_back();
-        return s;
-    };
+    if (!incDirs.empty())
+        incDirs.pop_back();
+    if (!compileFlags.empty())
+        compileFlags.pop_back();
+    if (!linkFlags.empty())
+        linkFlags.pop_back();
 
     oss << std::format(
         "set_target_properties({} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES \"{}\")\n", cmakeName,
-        stringabunga(std::move(incDirs)));
+        incDirs);
 
     oss << std::format("set_target_properties({} PROPERTIES INTERFACE_COMPILE_OPTIONS \"{}\")\n",
-                       cmakeName, stringabunga(std::move(compileFlags)));
+                       cmakeName, compileFlags);
 
-    std::string linkFlagsStr = std::move(linkFlags).str();
-    if (!linkFlagsStr.empty())
-        linkFlagsStr.pop_back();
     oss << std::format("set_target_properties({} PROPERTIES INTERFACE_LINK_LIBRARIES \"{}\")\n",
-                       cmakeName, stringabunga(std::move(linkFlags)));
+                       cmakeName, linkFlags);
 
     oss << '\n';
 }
@@ -408,19 +332,12 @@ void write_cmakeliststxt_file(std::string_view name, std::string_view findPackag
     ofs << cmakeFileContent;
 }
 
-Directory prefix_dir(const ParsedCmakeResult &result)
-{
-    if (result.config.empty())
-        LOGW("config did not report its own path — using '.' as the package dir");
-    return result.config.empty() ? Directory::make(".") : prefix_dir_of(result.config);
-}
-
 std::optional<ParsedCmakeResult> run_cmake_cmd_and_parse_stdout(const std::string &cmakeCmd,
                                                                 const File &stdoutFile)
 {
     if (std::system(cmakeCmd.data()) != 0)
     {
-        LOGI("cmake find_package run failed");
+        LOGE("cmake find_package run failed");
         return {};
     }
 
@@ -435,59 +352,94 @@ std::optional<ParsedCmakeResult> run_cmake_cmd_and_parse_stdout(const std::strin
     return parse_cmake_result(stdoutPath);
 }
 
-class Zimmify
+Target *cmake_to_target(const ImportedTarget &iTgt, ThirdPartyTarget &tpt)
 {
-    ThirdPartyTarget &tpt;
+    Target *target{};
 
-public:
-    Zimmify(ThirdPartyTarget &tpt) : tpt(tpt) {}
-
-    Target *operator()(const ImportedTarget &iTgt)
+    if (iTgt.type == "STATIC_LIBRARY")
+        target = tpt.assume_static_library(iTgt.name, iTgt.location);
+    else if (iTgt.type == "SHARED_LIBRARY" || iTgt.type == "MODULE_LIBRARY")
+        target = tpt.assume_shared_library(iTgt.name, iTgt.location);
+    else if (iTgt.type == "INTERFACE_LIBRARY")
+        target = tpt.assume_ho_library(iTgt.name, iTgt.location);
+    else if (iTgt.type == "EXECUTABLE")
+        target = tpt.assume_executable(iTgt.name, iTgt.location);
+    else
     {
-        Target *target{};
-
-        if (iTgt.type == "STATIC_LIBRARY")
-            target = tpt.assume_static_library(iTgt.name, iTgt.location);
-        else if (iTgt.type == "SHARED_LIBRARY" || iTgt.type == "MODULE_LIBRARY")
-            target = tpt.assume_shared_library(iTgt.name, iTgt.location);
-        else if (iTgt.type == "INTERFACE_LIBRARY")
-            target = tpt.assume_ho_library(iTgt.name, iTgt.location);
-        else if (iTgt.type == "EXECUTABLE")
-            target = tpt.assume_executable(iTgt.name, iTgt.location);
-        else
-        {
-            LOGE("Target=" << std::quoted(iTgt.name) << " of cmakeType=" << std::quoted(iTgt.type)
-                           << ", not supported");
-            return nullptr;
-        }
-
-        // TODO: relativeness of these paths?
-        for (const auto &incDir : iTgt.include_dirs)
-            target->add_public_property(IncludeProperty{Directory::make(incDir)});
-
-        // TODO: add system include property
-        for (const auto &incDir : iTgt.include_dirs)
-            target->add_public_property(CompileFlagProperty{std::format("-isystem {}", incDir)});
-
-        for (const auto &def : iTgt.defs)
-            target->add_public_property(CompileFlagProperty{std::format("-D{}", def)});
-
-        target->add_public_property(CompileFlagProperty{
-            iTgt.compile_opts | std::views::join_with(' ') | std::ranges::to<std::string>()});
-
-        for (const auto &linkDir : iTgt.link_dirs)
-            target->add_public_property(LinkFlagProperty{std::format("-L{}", linkDir)});
-
-        target->add_public_property(LinkFlagProperty{iTgt.link_opts | std::views::join_with(' ') |
-                                                     std::ranges::to<std::string>()});
-
-        // TODO: do we need to figure out the full name (libzimmermann.so vs zimmermann)
-        for (const auto &linkLib : iTgt.link_libs_direct)
-            target->add_public_property(LinkFlagProperty{std::format("-l{}", linkLib)});
-        return target;
+        LOGE("Target=" << std::quoted(iTgt.name) << " of cmakeType=" << std::quoted(iTgt.type)
+                       << ", not supported");
+        return nullptr;
     }
-};
 
+    for (const auto &incDir : iTgt.includeDirs)
+        target->add_public_property(IncludeProperty{Directory::make(incDir)});
+
+    for (const auto &incDir : iTgt.systemIncludeDirs)
+        target->add_public_property(CompileFlagProperty{std::format("-isystem {}", incDir)});
+
+    for (const auto &def : iTgt.defs)
+        target->add_public_property(CompileFlagProperty{std::format("-D{}", def)});
+
+    target->add_public_property(CompileFlagProperty{iTgt.compileFlags | std::views::join_with(' ') |
+                                                    std::ranges::to<std::string>()});
+
+    for (const auto &linkDir : iTgt.linkDirs)
+        target->add_public_property(LinkFlagProperty{std::format("-L{}", linkDir)});
+
+    target->add_public_property(LinkFlagProperty{iTgt.linkFlags | std::views::join_with(' ') |
+                                                 std::ranges::to<std::string>()});
+
+    return target;
+}
+
+std::string link_interface(std::string_view unknownLib)
+{
+    // Example: "-L/usr/lib64 -lraylib", "-lm", "-Wl,-wrap=main"
+    // it is a link flag, just pass it on
+    if (unknownLib[0] == '-')
+        return std::string{unknownLib};
+
+    // Example: "/usr/lib64/libexpat.so"
+    fs::path path{unknownLib};
+    if (fs::exists(path) && fs::is_regular_file(path) && path.is_absolute())
+    {
+        std::string staticOrShared;
+        return std::format("-L{} -l:{}", path.parent_path().string(), staticOrShared,
+                           path.filename());
+    }
+
+    // Example: dl
+    return "-l" + std::string{unknownLib};
+}
+
+std::string link_interface(const Target *t)
+{
+    switch (t->type())
+    {
+    case TargetType::StaticLibrary:
+    case TargetType::SharedLibrary:
+    {
+        auto &assumedPathOpt = t->assumed_path();
+        if (!assumedPathOpt)
+        {
+            LOGE("Target=" << to_string(t) << " is not assumed path");
+            return "";
+        }
+        const auto &assumedPath = *assumedPathOpt;
+        const auto &dir = assumedPath.path().parent_path().string();
+        const auto &filename = assumedPath.path().filename().string();
+        return std::format("-L{} -l:{}", dir, filename);
+    }
+    case TargetType::HeaderOnlyLibrary:
+        return "";
+    case TargetType::Executable:
+    case TargetType::ThirdPartyTarget:
+    case TargetType::CustomTarget:
+        LOGE("Unsupported target type " << to_string(t) << " for link interface, ignoring it");
+        return "";
+    }
+    std::unreachable();
+}
 } // namespace
 
 namespace zimm
@@ -528,28 +480,74 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
         cmake_cmd(scratch, m_buildType, m_searchDirs),
         scratch.file(std::format("vars_{}.txt", cmake_build_type(m_buildType))));
 
-    if (!cmakeResultOpt || cmakeResultOpt->config.empty())
+    if (!cmakeResultOpt)
         return {};
     ParsedCmakeResult &cmakeResult = *cmakeResultOpt;
 
-    Directory prefixDir = prefix_dir(cmakeResult);
-
-    ThirdPartyTarget *tpt = ThirdPartyTarget::make(std::string{name}, prefixDir);
+    // Directory is just a placeholder for cmake tpt, it has no meaning
+    ThirdPartyTarget *tpt =
+        ThirdPartyTarget::make(std::string{name}, Directory::make(cmakeResult.configDir));
 
     // add properties from old style config to tpt
-    for (const std::string &incDir : cmakeResult.include_dirs)
-        tpt->add_public_property(
-            IncludeProperty{Directory::make(resolve_against_config(incDir, cmakeResult.config))});
-    // TODO: fix this shit, linking is a pile of shit right now, we link randomly with random shit,
-    // unify it. We definitely are causing issues with public link lib properties where there exist
-    // multiple instances of link object in the linked object
-    for (const std::string &linkLib : cmakeResult.libraries)
-        tpt->add_public_property(LinkFlagProperty{normalize_lib_entry(linkLib)});
+    for (const std::string &incDir : cmakeResult.includeDirs)
+        tpt->add_public_property(IncludeProperty{Directory::make(incDir)});
 
-    auto zimmTargets = cmakeResult.imported_targets | std::views::transform(Zimmify{*tpt}) |
-                       std::views::filter(std::identity{}) /* filter out nullptr */ |
-                       std::ranges::to<std::vector>();
+    // TODO: replace this with link targets
+    // for (const std::string &linkLib : cmakeResult.libraries)
+    //     tpt->add_public_property(LinkFlagProperty{std::format("-l{}", linkLib)});
 
-    return {tpt, std::move(zimmTargets)};
+    // targetName -> <target, span of linkLibs>
+    using StringSpan = std::span<const std::string>;
+    std::unordered_map<std::string_view, std::pair<Target *, StringSpan>> zimmTargetsMap;
+
+    const auto tryEmplace = [&zimmTargetsMap](Target *t, StringSpan depNames)
+    {
+        auto [iter, inserted] = zimmTargetsMap.try_emplace(t->name(), t, depNames);
+        zimmTargetsMap.try_emplace(t->name(), t, std::span<const std::string>{});
+        if (!inserted)
+            LOGW("Could not insert target (" << to_string(t) << ") because (" << iter->second.first
+                                             << ") already exists in map");
+        return inserted;
+    };
+
+    for (auto &cmakeDep : deps)
+    {
+        for (auto t : cmakeDep.targets())
+            tryEmplace(t, {});
+        tryEmplace(cmakeDep.tpt(), {});
+    }
+
+    std::vector<Target *> importedTargets;
+    for (const ImportedTarget &iTgt : cmakeResult.importedTargets)
+    {
+        Target *t = cmake_to_target(iTgt, *tpt);
+        if (!t)
+            continue;
+        if (tryEmplace(t, iTgt.linkLibs))
+            importedTargets.push_back(t);
+    }
+
+    for (auto [_, v] : zimmTargetsMap)
+    {
+        auto [target, linkLibs] = v;
+        for (std::string_view libName : linkLibs)
+        {
+            auto libIter = zimmTargetsMap.find(libName);
+            if (libIter == zimmTargetsMap.end())
+            {
+                if (auto linkFlag = link_interface(libName); !linkFlag.empty())
+                    target->add_public_property(LinkFlagProperty{std::move(linkFlag)});
+            }
+            else
+            {
+                Target *libTarget = libIter->second.first;
+                if (auto linkFlag = link_interface(libTarget); !linkFlag.empty())
+                    target->add_public_property(LinkFlagProperty{std::move(linkFlag)});
+                target->add_public_dependency(libTarget);
+            }
+        }
+    }
+
+    return {tpt, importedTargets};
 }
 } // namespace zimm

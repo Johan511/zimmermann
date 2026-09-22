@@ -30,8 +30,8 @@ public:
         : m_path(std::forward<P>(p))
     {
         if (m_path.empty() || !m_path.is_relative())
-            LOGF("path=" << m_path << "received from " << to_string(loc)
-                         << " is not a non-empty relative path");
+            LOGF("path=" << m_path
+                         << " is not a non-empty relative path, call_site=" << to_string(loc));
     }
     const std::filesystem::path &path() const & noexcept { return m_path; }
     std::filesystem::path path() && noexcept { return std::move(m_path); }
@@ -46,19 +46,26 @@ class File
     friend class Directory;
     friend File rel_file(std::string, std::source_location);
 
+    struct MakeImpl
+    {
+        File operator()(std::string pathStr,
+                        std::source_location loc = std::source_location::current()) const
+        {
+            std::filesystem::path path{std::move(pathStr)};
+
+            if (path.empty())
+                LOGF("File can not be constructed from empty path=" << path << " call site = "
+                                                                    << detail::to_string(loc));
+            path = std::filesystem::absolute(path);
+            return File{std::move(path)};
+        }
+    };
+
 public:
     std::filesystem::path path() && { return std::move(m_path); }
     const std::filesystem::path &path() const & { return m_path; }
 
-    static File make(std::string pathStr)
-    {
-        std::filesystem::path path{std::move(pathStr)};
-
-        if (path.empty())
-            LOGF("File can not be constructed from empty path = " << path);
-        path = std::filesystem::absolute(path);
-        return File{std::move(path)};
-    }
+    static constexpr MakeImpl make{}; // NOLINT
 };
 
 class Directory
@@ -67,6 +74,20 @@ class Directory
     explicit Directory(std::filesystem::path path) : m_path(std::move(path)) {}
 
     friend Directory rel_dir(std::string, std::source_location);
+
+    struct MakeImpl
+    {
+        Directory operator()(std::string pathStr,
+                             std::source_location loc = std::source_location::current()) const
+        {
+            if (pathStr.empty())
+                LOGF("Directory can not be constructed from empty path="
+                     << std::quoted(pathStr) << " call site = " << detail::to_string(loc));
+
+            auto path = std::filesystem::absolute(std::move(pathStr));
+            return Directory{std::move(path)};
+        }
+    };
 
 public:
     std::filesystem::path path() && { return std::move(m_path); }
@@ -81,14 +102,7 @@ public:
                                      : m_path.parent_path().filename().string();
     }
 
-    static Directory make(std::string pathStr)
-    {
-        if (pathStr.empty())
-            LOGF("Directory can not be constructed from empty path = " << std::quoted(pathStr));
-
-        auto path = std::filesystem::absolute(std::move(pathStr));
-        return Directory{std::move(path)};
-    }
+    static constexpr MakeImpl make{}; // NOLINT
 };
 
 namespace detail
