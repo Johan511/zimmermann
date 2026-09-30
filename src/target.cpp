@@ -86,8 +86,7 @@ void detail::LinkTrait::link_impl(Library *linkLib, bool publicNotPrivate)
     {
         if (linkLibType != TargetType::StaticLibrary)
         {
-            // TODO: figure out how to deal with shared libraries linking into static libraries
-            LOGE("Static library (" << to_string(thisTarget)
+            LOGF("Static library (" << to_string(thisTarget)
                                     << ") can only be linked with Static Library, not "
                                     << to_string(linkLib));
             return;

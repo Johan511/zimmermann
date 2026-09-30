@@ -112,12 +112,10 @@ SharedLibrary *ThirdPartyTarget::assume_shared_library(std::string name, std::st
     return target;
 }
 
-HeaderOnlyLibrary *ThirdPartyTarget::assume_ho_library(std::string name, std::string path)
+HeaderOnlyLibrary *ThirdPartyTarget::assume_ho_library(std::string name)
 {
     auto target = make_header_only_library(std::move(name));
     target->add_private_dependency(this);
-    // header-only targets have assumed path; the path names their include dir
-    target->add_public_property(IncludeProperty{Directory::make(m_dir.path() / std::move(path))});
     return target;
 }
 
@@ -132,7 +130,7 @@ Target *ThirdPartyTarget::assume_target(TargetType type, std::string name, std::
     case TargetType::SharedLibrary:
         return assume_shared_library(std::move(name), std::move(path));
     case TargetType::HeaderOnlyLibrary:
-        return assume_ho_library(std::move(name), std::move(path));
+        return assume_ho_library(std::move(name));
     default:
         LOGE("ThirdPartyTarget::assume_target: unsupported TargetType " << to_string(type)
                                                                         << " for '" << name << "'");

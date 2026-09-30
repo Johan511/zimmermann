@@ -15,7 +15,19 @@ __attribute__((weak)) Directory zimm_dir();
 
 namespace
 {
-std::string ninja_target_name(const Target &target)
+std::string ninja_escape(std::string_view targetName)
+{
+    std::string escapedTargetName;
+    for (auto c : targetName)
+    {
+        if (c == ':' || c == ' ' || c == '$')
+            escapedTargetName += '$';
+        escapedTargetName += c;
+    }
+    return escapedTargetName;
+}
+
+std::string ninja_target_name_impl(const Target &target)
 {
     const auto &assumedPath = target.assumed_path();
     if (assumedPath)
@@ -36,8 +48,10 @@ std::string ninja_target_name(const Target &target)
     case TargetType::CustomTarget:
         return std::format("{}_ct", target.name());
     }
-    return "Unknown:" + to_string(target);
+    std::unreachable();
 }
+
+std::string ninja_target_name(const Target &t) { return ninja_escape(ninja_target_name_impl(t)); }
 
 std::string get_compile_flags(std::span<const PolyProperty> props)
 {

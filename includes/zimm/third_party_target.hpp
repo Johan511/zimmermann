@@ -92,7 +92,7 @@ public:
     Executable *assume_executable(std::string name, std::string path);
     StaticLibrary *assume_static_library(std::string name, std::string path);
     SharedLibrary *assume_shared_library(std::string name, std::string path);
-    HeaderOnlyLibrary *assume_ho_library(std::string name, std::string path);
+    HeaderOnlyLibrary *assume_ho_library(std::string name);
     Target *assume_target(TargetType, std::string name, std::string path);
 
     std::pair<std::vector<Executable *>, std::vector<Library *>>

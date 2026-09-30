@@ -11,6 +11,8 @@
 
 namespace meta = std::meta;
 namespace fs = std::filesystem;
+namespace ranges = std::ranges;
+namespace views = std::views;
 using namespace zimm;
 
 namespace
@@ -54,6 +56,16 @@ std::string_view cmake_type_of(TargetType type)
     }
     return "";
 }
+
+static constexpr auto trimWs = [](const auto &s) -> std::string_view
+{
+    std::string_view sv{s.begin(), s.end()};
+    auto start = sv.find_first_not_of(" \t");
+    if (start == std::string_view::npos)
+        return {};
+    auto end = sv.find_last_not_of(" \t");
+    return sv.substr(start, end - start + 1);
+};
 
 struct ImportedTarget
 {
@@ -121,8 +133,9 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
         if constexpr (std::same_as<MemberType, std::string>)
             member = std::move(value);
         else if constexpr (std::same_as<MemberType, std::vector<std::string>>)
-            member = std::move(value) | std::views::split(';') |
-                     std::ranges::to<std::vector<std::string>>();
+            member = std::move(value) | views::split(';') | views::transform(trimWs) |
+                     views::cache_latest | views::filter(ranges::size) |
+                     ranges::to<std::vector<std::string>>();
         else
             static_assert(false, "only std::string and std::vector<std::string> are supported");
     };
@@ -314,7 +327,7 @@ std::string cmake_cmd(const Directory &scratchDir, std::string_view zimmBuildTyp
     constexpr auto dir2Str = [](auto &dir) { return dir.path().string(); };
     std::string prefixPathFlag =
         std::format("-DCMAKE_PREFIX_PATH='{:s}'",
-                    searchDirs | std::views::transform(dir2Str) | std::views::join_with(';'));
+                    searchDirs | views::transform(dir2Str) | views::join_with(';'));
     const std::string buildDir = (scratchDir.path() / "build").string();
     const std::string logFile = (scratchDir.path() / "configure.log").string();
     const std::string scratchPath = scratchDir.path().string();
@@ -361,7 +374,7 @@ Target *cmake_to_target(const ImportedTarget &iTgt, ThirdPartyTarget &tpt)
     else if (iTgt.type == "SHARED_LIBRARY" || iTgt.type == "MODULE_LIBRARY")
         target = tpt.assume_shared_library(iTgt.name, iTgt.location);
     else if (iTgt.type == "INTERFACE_LIBRARY")
-        target = tpt.assume_ho_library(iTgt.name, iTgt.location);
+        target = tpt.assume_ho_library(iTgt.name);
     else if (iTgt.type == "EXECUTABLE")
         target = tpt.assume_executable(iTgt.name, iTgt.location);
     else
@@ -380,14 +393,14 @@ Target *cmake_to_target(const ImportedTarget &iTgt, ThirdPartyTarget &tpt)
     for (const auto &def : iTgt.defs)
         target->add_public_property(CompileFlagProperty{std::format("-D{}", def)});
 
-    target->add_public_property(CompileFlagProperty{iTgt.compileFlags | std::views::join_with(' ') |
-                                                    std::ranges::to<std::string>()});
+    target->add_public_property(
+        CompileFlagProperty{iTgt.compileFlags | views::join_with(' ') | ranges::to<std::string>()});
 
     for (const auto &linkDir : iTgt.linkDirs)
         target->add_public_property(LinkFlagProperty{std::format("-L{}", linkDir)});
 
-    target->add_public_property(LinkFlagProperty{iTgt.linkFlags | std::views::join_with(' ') |
-                                                 std::ranges::to<std::string>()});
+    target->add_public_property(
+        LinkFlagProperty{iTgt.linkFlags | views::join_with(' ') | ranges::to<std::string>()});
 
     return target;
 }
@@ -402,11 +415,7 @@ std::string link_interface(std::string_view unknownLib)
     // Example: "/usr/lib64/libexpat.so"
     fs::path path{unknownLib};
     if (fs::exists(path) && fs::is_regular_file(path) && path.is_absolute())
-    {
-        std::string staticOrShared;
-        return std::format("-L{} -l:{}", path.parent_path().string(), staticOrShared,
-                           path.filename());
-    }
+        return std::format("-L{} -l:{}", path.parent_path().string(), path.filename());
 
     // Example: dl
     return "-l" + std::string{unknownLib};
