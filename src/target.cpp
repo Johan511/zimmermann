@@ -85,12 +85,9 @@ void detail::LinkTrait::link_impl(Library *linkLib, bool publicNotPrivate)
     else if (thisType == TargetType::StaticLibrary)
     {
         if (linkLibType != TargetType::StaticLibrary)
-        {
             LOGF("Static library (" << to_string(thisTarget)
                                     << ") can only be linked with Static Library, not "
                                     << to_string(linkLib));
-            return;
-        }
     }
     else
         LOGF("Can not link anything to " << to_string(thisType));

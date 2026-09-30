@@ -192,7 +192,6 @@ std::optional<ParsedCmakeResult> parse_cmake_result(const fs::path &cmakeResults
     return result;
 }
 
-// TODO: get rid of conditionals in the wrapper
 constexpr auto WRAPPER_TEMPLATE = R"CMAKELISTS(
 cmake_minimum_required(VERSION 3.25)
 project(zimm_find NONE)
@@ -501,10 +500,6 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
     for (const std::string &incDir : cmakeResult.includeDirs)
         tpt->add_public_property(IncludeProperty{Directory::make(incDir)});
 
-    // TODO: replace this with link targets
-    // for (const std::string &linkLib : cmakeResult.libraries)
-    //     tpt->add_public_property(LinkFlagProperty{std::format("-l{}", linkLib)});
-
     // targetName -> <target, span of linkLibs>
     using StringSpan = std::span<const std::string>;
     std::unordered_map<std::string_view, std::pair<Target *, StringSpan>> zimmTargetsMap;
@@ -512,9 +507,9 @@ ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view n
     const auto tryEmplace = [&zimmTargetsMap](Target *t, StringSpan depNames)
     {
         auto [iter, inserted] = zimmTargetsMap.try_emplace(t->name(), t, depNames);
-        zimmTargetsMap.try_emplace(t->name(), t, std::span<const std::string>{});
         if (!inserted)
-            LOGW("Could not insert target (" << to_string(t) << ") because (" << iter->second.first
+            LOGW("Could not insert target (" << to_string(t) << ") because ("
+                                             << to_string(iter->second.first)
                                              << ") already exists in map");
         return inserted;
     };

@@ -221,8 +221,8 @@ void generate_build(Project &project)
     out << "rule ar\n";
     out << "  command = rm -f $out && { "
            R"(echo "create $out"; )"
-           R"(printf "addmod %s\n" $objs; )"
-           R"(printf "addlib %s\n" $libs; )"
+           R"(if [ -n "$objs" ]; then printf "addmod %s\n" $objs; fi; )"
+           R"(if [ -n "$libs" ]; then printf "addlib %s\n" $libs; fi; )"
            R"(echo "save"; echo "end"; } | )"
         << ar << " -M\n";
     out << "  description = AR $out\n\n";
@@ -303,11 +303,11 @@ void generate_build(Project &project)
             }
         }
 
+        auto linkTrait = dynamic_cast<const detail::LinkTrait *>(targetPtr);
         switch (target.type())
         {
         case TargetType::StaticLibrary:
         {
-            auto linkTrait = dynamic_cast<const detail::LinkTrait *>(targetPtr);
             std::string linkLibNames;
             for (auto linkLibName :
                  linkTrait->link_sources() |
@@ -329,21 +329,18 @@ void generate_build(Project &project)
             if (!depsEnsured)
                 out << " | " << depList;
             out << '\n';
-            out << "  ldflags = -shared " << globalLinkFlags << " " << localLinkFlags << "\n";
-
-            auto linkTrait = dynamic_cast<const detail::LinkTrait *>(targetPtr);
             out << "  libs = " << link_trait_to_binary_link_flags(linkTrait) << "\n\n";
+            out << "  ldflags = -shared " << globalLinkFlags << " " << localLinkFlags << "\n";
             break;
         }
         case TargetType::Executable:
         {
-            auto linkTrait = dynamic_cast<const detail::LinkTrait *>(targetPtr);
             out << "build " << ninjaTargetName << ": link " << sourceObjectsNinjaNames;
             if (!depsEnsured)
                 out << " | " << depList;
             out << '\n';
-            out << "  ldflags = " << globalLinkFlags << " " << localLinkFlags << " "
-                << link_trait_to_binary_link_flags(linkTrait) << "\n\n";
+            out << "  libs = " << link_trait_to_binary_link_flags(linkTrait) << "\n";
+            out << "  ldflags = " << globalLinkFlags << " " << localLinkFlags << "\n\n";
             break;
         }
         case TargetType::HeaderOnlyLibrary:

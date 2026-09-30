@@ -177,10 +177,10 @@ int test_packages()
         }
     }
 
-    std::cout << "\n==== summary ====" << std::endl;
+    std::cout << "\n==== summary ====" << '\n';
     for (const std::string &line : summary)
-        std::cout << line << std::endl;
-    std::cout << std::format("\n{} pass, {} fail", passCount, failCount) << std::endl;
+        std::cout << line << '\n';
+    std::cout << std::format("\n{} pass, {} fail", passCount, failCount) << '\n' << std::flush;
     return failCount == 0 ? 0 : 1;
 }
 
