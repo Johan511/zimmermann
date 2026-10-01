@@ -39,7 +39,7 @@ SharedLibrary *define_program_options()
 {
     FindCmakePackageTptStrategy boostStrategy{"COMPONENTS program_options"};
     ThirdPartyTargetManifest boostManifest = boostStrategy.attempt("Boost");
-    auto po = boostManifest.shared_libs("Boost::program_options").at(0);
+    auto po = boostManifest.shared_lib("Boost::program_options");
     return po;
 }
 

@@ -474,9 +474,20 @@ FindCmakePackageTptStrategy::FindCmakePackageTptStrategy(std::string findPackage
 {
 }
 
-ThirdPartyTargetManifest FindCmakePackageTptStrategy::attempt(std::string_view name,
-                                                              std::span<CmakeDependency> deps) const
+ThirdPartyTargetManifest
+FindCmakePackageTptStrategy::attempt(std::string_view name,
+                                     std::span<CmakeDependency> depsSpan) const
 {
+    auto deps = depsSpan |
+                std::views::filter(
+                    [](auto dep)
+                    {
+                        if (!dep.tpt())
+                            LOGW("Dropping empty ThirdPartyTargetManifest");
+                        return dep.tpt();
+                    }) |
+                std::ranges::to<std::vector>();
+
     Directory scratch = Directory::make(std::format(".zimm_cmake_find/{}", name));
 
     fs::remove_all(scratch.path());

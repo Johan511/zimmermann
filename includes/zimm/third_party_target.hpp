@@ -40,20 +40,11 @@ public:
     ThirdPartyTarget *tpt() { return m_tpt; }
     const ThirdPartyTarget *tpt() const { return m_tpt; }
 
-    std::vector<StaticLibrary *> static_libs(std::string_view name = "");
-    std::vector<const StaticLibrary *> static_libs(std::string_view name = "") const;
-
-    std::vector<SharedLibrary *> shared_libs(std::string_view name = "");
-    std::vector<const SharedLibrary *> shared_libs(std::string_view name = "") const;
-
-    std::vector<HeaderOnlyLibrary *> ho_libs(std::string_view name = "");
-    std::vector<const HeaderOnlyLibrary *> ho_libs(std::string_view name = "") const;
-
-    std::vector<Executable *> execs(std::string_view name = "");
-    std::vector<const Executable *> execs(std::string_view name = "") const;
-
-    std::vector<Target *> targets(std::string_view name = "");
-    std::vector<const Target *> targets(std::string_view name = "") const;
+    StaticLibrary *static_lib(std::string_view name) const noexcept;
+    SharedLibrary *shared_lib(std::string_view name) const noexcept;
+    HeaderOnlyLibrary *ho_lib(std::string_view name) const noexcept;
+    Executable *exec(std::string_view name) const noexcept;
+    std::span<Target *const> targets() const noexcept;
 };
 
 class ThirdPartyTarget;
@@ -94,9 +85,6 @@ public:
     SharedLibrary *assume_shared_library(std::string name, std::string path);
     HeaderOnlyLibrary *assume_ho_library(std::string name);
     Target *assume_target(TargetType, std::string name, std::string path);
-
-    std::pair<std::vector<Executable *>, std::vector<Library *>>
-    assume_manifest(const ThirdPartyTargetManifest &);
 
     std::string_view meta_build_cmd() const noexcept { return m_metaBuildCmd; }
     std::string_view build_cmd() const noexcept { return m_buildCmd; }

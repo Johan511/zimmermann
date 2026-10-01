@@ -329,8 +329,8 @@ void generate_build(Project &project)
             if (!depsEnsured)
                 out << " | " << depList;
             out << '\n';
-            out << "  libs = " << link_trait_to_binary_link_flags(linkTrait) << "\n\n";
-            out << "  ldflags = -shared " << globalLinkFlags << " " << localLinkFlags << "\n";
+            out << "  libs = " << link_trait_to_binary_link_flags(linkTrait) << '\n';
+            out << "  ldflags = -shared " << globalLinkFlags << " " << localLinkFlags << "\n\n";
             break;
         }
         case TargetType::Executable:

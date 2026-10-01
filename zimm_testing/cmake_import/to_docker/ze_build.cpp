@@ -154,7 +154,7 @@ int test_packages()
                         return FindCmakePackageTptStrategy::Dependency{iter->second};
                     }) |
                 std::ranges::to<std::vector>();
-            auto searchPaths = pkg.searchDirs | std::views::transform(Directory::make) |
+            auto searchPaths = pkg.searchDirs | std::views::transform(Directory::Make{}) |
                                std::ranges::to<std::vector>();
             FindCmakePackageTptStrategy strategy{searchPaths, std::string{pkg.cmakeArgs},
                                                  "relwithdebinfo"};
