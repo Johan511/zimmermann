@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cmath>
-#include <print>
+#include <iostream>
 
 namespace math
 {
@@ -24,6 +24,9 @@ struct Vec3
     }
 };
 
-inline void print(const Vec3 &v) { std::println("Vec3({}, {}, {})", v.x, v.y, v.z); }
+inline void print(const Vec3 &v)
+{
+    std::cout << std::format("Vec3({}, {}, {})", v.x, v.y, v.z) << '\n';
+}
 
 } // namespace math

@@ -1,4 +1,3 @@
 #include "messages.hpp"
-#include <print>
-
-int main() { std::println("{}", GREETING); }
+#include <iostream>
+int main() { std::cout << GREETING << std::endl; }

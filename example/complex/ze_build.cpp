@@ -3,8 +3,6 @@
 #include "src/libmath/ze_build.hpp"
 #include "src/libnetwork/ze_build.hpp"
 
-#include <print>
-
 using namespace zimm;
 
 int main()
